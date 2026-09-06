@@ -121,6 +121,8 @@
         <button class="cat-tab" data-cat="upper">💪 الجزء العلوي</button>
         <button class="cat-tab" data-cat="lower">🦵 الجزء السفلي</button>
         <button class="cat-tab" data-cat="core">🔥 البطن والكارديو</button>
+        <button class="cat-tab" data-cat="custom" id="tab-custom-exercises">⭐ خاصة</button>
+        <button id="btn-open-custom-builder" class="cat-tab" style="background: var(--gold-gradient); color: #08080A; font-weight: 900;" title="صانع التمارين">➕ تمرين خاص</button>
       </div>
 
       <!-- Exercise Selector Chips (12 Comprehensive Exercises) -->
@@ -297,6 +299,60 @@
 
         <button id="btn-close-guide" class="btn-primary-workout" style="width: 100%; padding: 12px; font-size: 1rem;">
           <span>فهمت الطريقة! لنبدأ الآن 🚀</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- In-App Custom Exercise Creator & Calibration Modal -->
+    <div id="custom-exercise-modal" class="permission-modal">
+      <div class="permission-card" style="max-height: 88vh; overflow-y: auto;">
+        <div class="permission-title">
+          <span>🛠️</span>
+          <span>صانع التمارين الخاصة</span>
+        </div>
+        <p class="permission-desc" style="font-size: 0.82rem; margin-bottom: 12px;">
+          ابتكر تمرينك الخاص وحدد زوايا حركتك أمام الكاميرا، وسيتم حفظه في هاتفك بشكل دائم!
+        </p>
+
+        <!-- Exercise Name -->
+        <div style="margin-bottom: 12px;">
+          <label style="display: block; font-size: 0.8rem; color: var(--gold-bright); margin-bottom: 4px;">1. اسم التمرين:</label>
+          <input id="custom-input-name" type="text" placeholder="مثال: عقلة خاصة، رفرفة دمبلز..." style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.5); border: 1px solid var(--gold-border); border-radius: 10px; color: #FFF; font-family: 'Cairo'; font-size: 0.9rem; outline: none;">
+        </div>
+
+        <!-- Target Joint -->
+        <div style="margin-bottom: 14px;">
+          <label style="display: block; font-size: 0.8rem; color: var(--gold-bright); margin-bottom: 4px;">2. المفصل المستهدف:</label>
+          <select id="custom-select-joint" style="width: 100%; padding: 9px 12px; background: #121216; border: 1px solid var(--gold-border); border-radius: 10px; color: #FFF; font-family: 'Cairo'; font-size: 0.88rem;">
+            <option value="knee">🦵 الركبة والفخذ (مثل السكوات والطعنات)</option>
+            <option value="elbow">💪 الكوع والذراع (مثل البايسبس والضغط والعقلة)</option>
+            <option value="shoulder">🏋️ الكتف والجذع (مثل الرفرفة وضغط الأكتاف)</option>
+            <option value="hip">🍫 الحوض والبطن (مثل المعدة والرفعة الميتة)</option>
+          </select>
+        </div>
+
+        <!-- Live Calibration Box -->
+        <div style="background: rgba(212, 175, 55, 0.08); border: 1px solid var(--gold-border); border-radius: 14px; padding: 12px; margin-bottom: 14px; text-align: center;">
+          <div style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 2px;">الزاوية الحالية للمفصل أمام الكاميرا:</div>
+          <div id="custom-live-angle-display" style="font-family: 'Outfit', sans-serif; font-size: 2.2rem; font-weight: 900; color: var(--gold-bright);">--°</div>
+
+          <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <button id="btn-calibrate-start" type="button" style="flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; padding: 8px 4px; font-family: 'Cairo'; font-size: 0.78rem; color: #FFF; cursor: pointer;">
+              📌 وضعية البداية
+              <div id="badge-start-angle" style="color: var(--gold-bright); font-weight: 800; font-size: 0.85rem; margin-top: 2px;">160°</div>
+            </button>
+            <button id="btn-calibrate-end" type="button" style="flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; padding: 8px 4px; font-family: 'Cairo'; font-size: 0.78rem; color: #FFF; cursor: pointer;">
+              🎯 أقصى نزول / انثناء
+              <div id="badge-end-angle" style="color: #2ECC71; font-weight: 800; font-size: 0.85rem; margin-top: 2px;">80°</div>
+            </button>
+          </div>
+        </div>
+
+        <button id="btn-save-custom-exercise" class="btn-primary-workout" style="width: 100%; padding: 12px; font-size: 0.98rem; margin-bottom: 8px;">
+          <span>💾 حفظ التمرين في هاتفي بشكل دائم</span>
+        </button>
+        <button id="btn-cancel-custom-exercise" class="btn-modal-dismiss">
+          إلغاء
         </button>
       </div>
     </div>

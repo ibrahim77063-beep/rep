@@ -31,11 +31,24 @@ class PoseEngine {
     this.isProcessing = false;
     this.guideTick = 0; // Animation counter for green guide lines
 
+    // Dynamic Custom Exercises Engine
+    this.customExercises = {};
+    this.onLiveCalibration = options.onLiveCalibration || (() => {});
+    this.calibratingJoint = null;
+
     this.pose = null;
     this.stream = null;
     this.animationFrameId = null;
 
     this.initMediaPipe();
+  }
+
+  registerCustomExercise(id, config) {
+    this.customExercises[id] = config;
+  }
+
+  setCalibratingJoint(jointName) {
+    this.calibratingJoint = jointName;
   }
 
   // Initialize MediaPipe Pose with mobile-optimized parameters
@@ -395,6 +408,30 @@ class PoseEngine {
     ctx.fill();
   }
 
+  // Calculate dynamic angle for any specified joint
+  getJointAngle(jointName, lm) {
+    const leftArmVis = (lm[11].visibility + lm[13].visibility + lm[15].visibility) / 3;
+    const rightArmVis = (lm[12].visibility + lm[14].visibility + lm[16].visibility) / 3;
+    const leftLegVis = (lm[23].visibility + lm[25].visibility + lm[27].visibility) / 3;
+    const rightLegVis = (lm[24].visibility + lm[26].visibility + lm[28].visibility) / 3;
+
+    const shoulder = leftArmVis > rightArmVis ? lm[11] : lm[12];
+    const elbow = leftArmVis > rightArmVis ? lm[13] : lm[14];
+    const wrist = leftArmVis > rightArmVis ? lm[15] : lm[16];
+
+    const hip = leftLegVis > rightLegVis ? lm[23] : lm[24];
+    const knee = leftLegVis > rightLegVis ? lm[25] : lm[26];
+    const ankle = leftLegVis > rightLegVis ? lm[27] : lm[28];
+
+    switch (jointName) {
+      case 'knee': return this.calculateAngle(hip, knee, ankle);
+      case 'elbow': return this.calculateAngle(shoulder, elbow, wrist);
+      case 'hip': return this.calculateAngle(shoulder, hip, knee);
+      case 'shoulder': return this.calculateAngle(hip, shoulder, elbow);
+      default: return this.calculateAngle(hip, knee, ankle);
+    }
+  }
+
   // Comprehensive Exercise Library with State Machines
   evaluateExercise(lm) {
     let angle = 0;
@@ -688,6 +725,59 @@ class PoseEngine {
         }
         break;
       }
+
+      // 13. CUSTOM USER-DEFINED EXERCISES (التمارين الخاصة المخصصة)
+      default: {
+        if (this.currentExercise && this.currentExercise.startsWith('custom_')) {
+          const cfg = this.customExercises[this.currentExercise];
+          if (cfg) {
+            angle = this.getJointAngle(cfg.joint || 'knee', lm);
+            const startA = Number(cfg.startAngle) || 160;
+            const endA = Number(cfg.endAngle) || 80;
+
+            if (startA > endA) {
+              // Descending movement (e.g., Squats/Dips: 160° down to 80°)
+              progress = Math.min(100, Math.max(0, Math.round(((startA - angle) / (startA - endA)) * 100)));
+              if (angle <= endA + 8) {
+                if (this.state === 'UP') {
+                  this.state = 'DOWN';
+                  if (!this.cuePlayed) { this.onCue(); this.cuePlayed = true; }
+                }
+              } else if (angle >= startA - 12) {
+                if (this.state === 'DOWN') {
+                  this.state = 'UP';
+                  this.repCount++;
+                  this.cuePlayed = false;
+                  this.onRep(this.repCount, progress >= 85 ? 'perfect' : 'good');
+                }
+              }
+            } else {
+              // Ascending movement (e.g., Curls/Press: 45° up to 150°)
+              progress = Math.min(100, Math.max(0, Math.round(((angle - startA) / (endA - startA)) * 100)));
+              if (angle >= endA - 8) {
+                if (this.state === 'DOWN') {
+                  this.state = 'UP';
+                  if (!this.cuePlayed) { this.onCue(); this.cuePlayed = true; }
+                }
+              } else if (angle <= startA + 12) {
+                if (this.state === 'UP') {
+                  this.state = 'DOWN';
+                  this.repCount++;
+                  this.cuePlayed = false;
+                  this.onRep(this.repCount, progress >= 85 ? 'perfect' : 'good');
+                }
+              }
+            }
+          }
+        }
+        break;
+      }
+    }
+
+    // Live Calibration Mode feedback
+    if (this.calibratingJoint) {
+      const liveAngle = this.getJointAngle(this.calibratingJoint, lm);
+      this.onLiveCalibration(liveAngle);
     }
 
     this.onAngleUpdate({

@@ -514,6 +514,186 @@ document.addEventListener('DOMContentLoaded', () => {
     showCoachToast(audioCoach.language === 'ar' ? 'تم تصفير العداد' : 'Counter reset');
   });
 
+  // ==========================================
+  // IN-APP CUSTOM EXERCISE BUILDER (حفظ دائم)
+  // ==========================================
+  const btnOpenCustomBuilder = document.getElementById('btn-open-custom-builder');
+  const customModal = document.getElementById('custom-exercise-modal');
+  const btnCancelCustom = document.getElementById('btn-cancel-custom-exercise');
+  const btnSaveCustom = document.getElementById('btn-save-custom-exercise');
+  const customInputName = document.getElementById('custom-input-name');
+  const customSelectJoint = document.getElementById('custom-select-joint');
+  const customLiveAngleDisplay = document.getElementById('custom-live-angle-display');
+  const btnCalibrateStart = document.getElementById('btn-calibrate-start');
+  const btnCalibrateEnd = document.getElementById('btn-calibrate-end');
+  const badgeStartAngle = document.getElementById('badge-start-angle');
+  const badgeEndAngle = document.getElementById('badge-end-angle');
+  const chipsContainer = document.getElementById('exercise-chips-container');
+
+  let recordedStartAngle = 160;
+  let recordedEndAngle = 80;
+  let currentCalibAngle = 160;
+
+  // Live angle feedback from camera during calibration
+  poseEngine.onLiveCalibration = (angle) => {
+    currentCalibAngle = angle;
+    if (customLiveAngleDisplay) {
+      customLiveAngleDisplay.textContent = `${angle}°`;
+    }
+  };
+
+  // Open Builder Modal
+  if (btnOpenCustomBuilder) {
+    btnOpenCustomBuilder.addEventListener('click', () => {
+      audioCoach.unlock();
+      if (!poseEngine.isRunning) {
+        poseEngine.startCamera().catch(e => console.warn(e));
+      }
+      poseEngine.setCalibratingJoint(customSelectJoint.value);
+      if (customModal) customModal.classList.add('show');
+    });
+  }
+
+  // Joint Selection Changed
+  if (customSelectJoint) {
+    customSelectJoint.addEventListener('change', () => {
+      poseEngine.setCalibratingJoint(customSelectJoint.value);
+    });
+  }
+
+  // Record Start Angle
+  if (btnCalibrateStart) {
+    btnCalibrateStart.addEventListener('click', () => {
+      recordedStartAngle = currentCalibAngle || 160;
+      if (badgeStartAngle) badgeStartAngle.textContent = `${recordedStartAngle}°`;
+      showCoachToast(`تم حفظ زاوية البداية: ${recordedStartAngle}°`);
+    });
+  }
+
+  // Record End Angle
+  if (btnCalibrateEnd) {
+    btnCalibrateEnd.addEventListener('click', () => {
+      recordedEndAngle = currentCalibAngle || 80;
+      if (badgeEndAngle) badgeEndAngle.textContent = `${recordedEndAngle}°`;
+      showCoachToast(`تم حفظ زاوية النهاية: ${recordedEndAngle}°`);
+    });
+  }
+
+  // Close Builder
+  if (btnCancelCustom) {
+    btnCancelCustom.addEventListener('click', () => {
+      poseEngine.setCalibratingJoint(null);
+      if (customModal) customModal.classList.remove('show');
+    });
+  }
+
+  // Save Custom Exercise Permanently to LocalStorage
+  if (btnSaveCustom) {
+    btnSaveCustom.addEventListener('click', () => {
+      const name = (customInputName.value || '').trim();
+      if (!name) {
+        alert(audioCoach.language === 'ar' ? 'يرجى كتابة اسم للتمرين' : 'Please enter an exercise name');
+        return;
+      }
+
+      const id = `custom_${Date.now()}`;
+      const config = {
+        id,
+        nameAr: `⭐ ${name}`,
+        nameEn: name,
+        cat: 'custom',
+        joint: customSelectJoint.value,
+        startAngle: recordedStartAngle,
+        endAngle: recordedEndAngle,
+        calFactor: 0.35,
+        unitAr: 'تكرار',
+        unitEn: 'Reps',
+        targetAngle: `${recordedEndAngle}°`,
+        steps: [
+          `ابدأ التمرين في وضعية الزاوية (${recordedStartAngle}°).`,
+          `تحرك بأقصى انثناء حتى تصل للزاوية (${recordedEndAngle}°).`,
+          `عد لوضعية البداية لإكمال التكرار بنجاح.`
+        ],
+        mistakes: ['حافظ على حركة منتظمة وثابتة.']
+      };
+
+      // 1. Save to LocalStorage permanently
+      saveCustomExerciseToStorage(config);
+
+      // 2. Register in PoseEngine and Database
+      registerAndRenderCustomExercise(config, true);
+
+      // 3. Reset and Close Modal
+      poseEngine.setCalibratingJoint(null);
+      customInputName.value = '';
+      if (customModal) customModal.classList.remove('show');
+
+      showCoachToast(`تم حفظ وتفعيل تمرين: ${name}`);
+      audioCoach.speak(audioCoach.language === 'ar' ? `تم حفظ تمرين ${name} بنجاح` : `Custom exercise ${name} saved`);
+    });
+  }
+
+  function saveCustomExerciseToStorage(config) {
+    try {
+      const list = JSON.parse(localStorage.getItem('goldrep_custom_exercises') || '[]');
+      list.push(config);
+      localStorage.setItem('goldrep_custom_exercises', JSON.stringify(list));
+    } catch (e) {
+      console.warn('LocalStorage save error:', e);
+    }
+  }
+
+  function registerAndRenderCustomExercise(config, selectImmediately = false) {
+    // Register in EXERCISES_DB
+    EXERCISES_DB[config.id] = config;
+
+    // Register in PoseEngine
+    poseEngine.registerCustomExercise(config.id, config);
+
+    // Create UI chip button if not already in DOM
+    let btn = document.querySelector(`[data-exercise="${config.id}"]`);
+    if (!btn && chipsContainer) {
+      btn = document.createElement('button');
+      btn.className = 'chip-btn';
+      btn.dataset.exercise = config.id;
+      btn.dataset.cat = 'custom';
+      btn.innerHTML = `${config.nameAr}`;
+
+      btn.addEventListener('click', () => {
+        document.querySelectorAll('.chip-btn').forEach(c => c.classList.remove('active'));
+        btn.classList.add('active');
+
+        currentExerciseKey = config.id;
+        poseEngine.setExercise(config.id);
+        poseEngine.resetCounter();
+        repCountEl.textContent = '0';
+        caloriesBurnedEl.textContent = '0';
+        if (repUnitEl) repUnitEl.textContent = audioCoach.language === 'ar' ? config.unitAr : config.unitEn;
+        if (repProgressRing) repProgressRing.style.strokeDashoffset = RING_CIRCUMFERENCE;
+
+        showCoachToast(`تمرين: ${config.nameAr}`);
+        audioCoach.speak(audioCoach.language === 'ar' ? `تمرين ${config.nameAr}` : `Exercise ${config.nameEn}`);
+      });
+
+      chipsContainer.appendChild(btn);
+    }
+
+    if (selectImmediately && btn) {
+      btn.click();
+    }
+  }
+
+  // Load all custom exercises on app startup
+  function loadStoredCustomExercises() {
+    try {
+      const list = JSON.parse(localStorage.getItem('goldrep_custom_exercises') || '[]');
+      list.forEach(item => registerAndRenderCustomExercise(item, false));
+    } catch (e) {
+      console.warn('LocalStorage load error:', e);
+    }
+  }
+  loadStoredCustomExercises();
+
   // Register PWA Service Worker
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
