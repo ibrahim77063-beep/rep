@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="GoldRep AI - تطبيق ذكي لعد تمارين اللياقة والتكرارات بالذكاء الاصطناعي مع مدرب صوتي تحفيزي وتصميم أسود وذهبي فاخر">
+  <title>GoldRep AI - مدرب اللياقة الذكي</title>
+
+  <!-- PWA & iOS Safari Optimizations -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="GoldRep AI">
+  <meta name="theme-color" content="#070709">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='25' fill='%23070709'/><path d='M30 65 L50 25 L70 65 L55 65 L50 50 L45 65 Z' fill='%23D4AF37'/></svg>">
+  <link rel="apple-touch-icon" href="icons/icon-192.png">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css">
+
+  <!-- MediaPipe Pose Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <div class="app-viewport">
+
+    <!-- Top Header -->
+    <header class="app-header">
+      <div class="brand-badge">
+        <div class="brand-logo-icon">👑</div>
+        <div class="brand-name">GoldRep AI</div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Language Switcher -->
+        <button id="btn-toggle-lang" class="icon-btn" title="تغيير اللغة" style="font-weight: 800; font-size: 0.8rem;">AR</button>
+        <!-- Sound Mute/Unmute -->
+        <button id="btn-toggle-mute" class="icon-btn" title="كتم/تشغيل الصوت">
+          <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"/>
+          </svg>
+        </button>
+        <!-- Camera Flip (Front / Back) -->
+        <button id="btn-toggle-camera" class="icon-btn" title="تبديل الكاميرا">
+          <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M20 4h-3.17L15 2H9L7.17 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-8 13c-2.76 0-5-2.24-5-5s2.24-5 5-5 5 2.24 5 5-2.24 5-5 5zm0-8c-1.65 0-3 1.35-3 3s1.35 3 3 3 3-1.35 3-3-1.35-3-3-3z"/>
+          </svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Camera Viewport -->
+    <main class="camera-stage">
+      <video id="webcam" playsinline webkit-playsinline muted autoplay></video>
+      <canvas id="output_canvas"></canvas>
+    </main>
+
+    <!-- Interactive Heads-Up Display (HUD) -->
+    <div class="hud-overlay">
+
+      <!-- Top Stats Bar -->
+      <div class="stats-bar">
+        <div class="stat-chip">
+          <span class="stat-label">المؤقت</span>
+          <span id="workout-timer" class="stat-value">00:00</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-label">سعرة حرارية</span>
+          <span id="calories-burned" class="stat-value">0</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-label">دقة الحركة</span>
+          <span id="form-score" class="stat-value">100%</span>
+        </div>
+      </div>
+
+      <!-- Center Big Rep Ring -->
+      <div class="center-counter-zone">
+        <div class="counter-ring-wrapper">
+          <svg class="counter-ring-svg" viewBox="0 0 170 170">
+            <defs>
+              <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#FFE898" />
+                <stop offset="50%" stop-color="#D4AF37" />
+                <stop offset="100%" stop-color="#9A7B1C" />
+              </linearGradient>
+            </defs>
+            <circle class="ring-bg" cx="85" cy="85" r="75"></circle>
+            <circle id="ring-progress" class="ring-progress" cx="85" cy="85" r="75"></circle>
+          </svg>
+
+          <div class="counter-core">
+            <div id="rep-count" class="rep-number">0</div>
+            <div class="rep-unit">تكرار</div>
+          </div>
+        </div>
+
+        <div id="state-badge" class="state-badge">
+          <span class="state-dot"></span>
+          <span id="state-text">جاهز (Ready)</span>
+        </div>
+      </div>
+
+      <!-- Coach Toast Encouragement -->
+      <div id="coach-toast" class="coach-toast">
+        <span>⚡</span>
+        <span id="coach-toast-text">استعد للبدء!</span>
+      </div>
+
+    </div>
+
+    <!-- Bottom Controls & Navigation -->
+    <footer class="bottom-controls">
+      <!-- Exercise Category Filter Tabs -->
+      <div class="category-tabs">
+        <button class="cat-tab active" data-cat="all">🌟 الكل (12)</button>
+        <button class="cat-tab" data-cat="upper">💪 الجزء العلوي</button>
+        <button class="cat-tab" data-cat="lower">🦵 الجزء السفلي</button>
+        <button class="cat-tab" data-cat="core">🔥 البطن والكارديو</button>
+      </div>
+
+      <!-- Exercise Selector Chips (12 Comprehensive Exercises) -->
+      <div class="exercise-scroll-chips" id="exercise-chips-container">
+        <!-- Lower Body -->
+        <button class="chip-btn active" data-exercise="squats" data-cat="lower">🦵 سكوات (Squats)</button>
+        <button class="chip-btn" data-exercise="lunges" data-cat="lower">🚶‍♂️ طعنات (Lunges)</button>
+        <button class="chip-btn" data-exercise="deadlifts" data-cat="lower">🏋️ رفعة ميتة (Deadlifts)</button>
+        
+        <!-- Upper Body -->
+        <button class="chip-btn" data-exercise="pushups" data-cat="upper">💪 تمرين الضغط (Push-ups)</button>
+        <button class="chip-btn" data-exercise="curls" data-cat="upper">🦾 بايسبس (Bicep Curls)</button>
+        <button class="chip-btn" data-exercise="shoulder_press" data-cat="upper">🏋️‍♂️ ضغط أكتاف (Shoulder Press)</button>
+        <button class="chip-btn" data-exercise="lateral_raises" data-cat="upper">🦅 رفرفة جانبي (Lateral Raises)</button>
+        <button class="chip-btn" data-exercise="tricep_dips" data-cat="upper">⚡ ترايسبس ديبس (Tricep Dips)</button>
+        
+        <!-- Core & Cardio -->
+        <button class="chip-btn" data-exercise="crunches" data-cat="core">🍫 تمارين المعدة (Crunches)</button>
+        <button class="chip-btn" data-exercise="leg_raises" data-cat="core">📐 رفع الأرجل (Leg Raises)</button>
+        <button class="chip-btn" data-exercise="jacks" data-cat="core">⭐ قفز نجمي (Jumping Jacks)</button>
+        <button class="chip-btn" data-exercise="plank" data-cat="core">⏱️ بلانك ثبات (Plank Hold)</button>
+      </div>
+
+      <!-- Action Row -->
+      <div class="action-row">
+        <!-- Start / Stop Button -->
+        <button id="btn-start-workout" class="btn-primary-workout">
+          <svg width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+          <span>بدء التمرين</span>
+        </button>
+
+        <!-- Reset Button -->
+        <button id="btn-reset" class="btn-secondary" title="تصفير العداد">
+          <svg width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+          </svg>
+        </button>
+      </div>
+    </footer>
+
+    <!-- Welcome / Onboarding Screen -->
+    <div id="welcome-modal" class="welcome-modal">
+      <div class="gold-crown-icon">
+        <svg width="42" height="42" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M5 16L3 5l5.5 5L12 4l3.5 6L21 5l-2 11H5zm14 3c0 .55-.45 1-1 1H6c-.55 0-1-.45-1-1v-1h14v1z"/>
+        </svg>
+      </div>
+      <h1 class="welcome-title">GoldRep AI</h1>
+      <p class="welcome-subtitle">مدرّبك الذكي لعدّ التمارين الرياضية بالرؤية الحاسوبية والذكاء الاصطناعي الخفيف مباشرة من هاتفك.</p>
+
+      <div class="features-list">
+        <div class="feature-item">
+          <span class="feature-dot"></span>
+          <span>عدّ آلي دقيق لزوايا المفاصل والتكرارات.</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-dot"></span>
+          <span>مدرب صوتي ينطق الأرقام وعبارات تحفيزية بعد كل عدة.</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-dot"></span>
+          <span>حساب السعرات المحروقة ومؤقت ذكي للجولات.</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-dot"></span>
+          <span>متوافق تماماً مع آيفون وأندرويد بدون أي تكاليف.</span>
+        </div>
+      </div>
+
+      <button id="btn-welcome-start" class="btn-primary-workout" style="width: 100%; max-width: 320px;">
+        <span>انطلق وابدأ التمرين الآن</span>
+        <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+      </button>
+    </div>
+
+    <!-- Summary Dialog after workout -->
+    <div id="summary-dialog" class="summary-dialog">
+      <div class="summary-card">
+        <div style="font-size: 2.8rem; margin-bottom: 8px;">🏆</div>
+        <h2 style="font-weight: 900; color: var(--gold-bright); margin-bottom: 4px;">عاش يا بطل!</h2>
+        <p style="color: var(--text-muted); font-size: 0.88rem;">ملخص إنجازك في الجولة التدريبية</p>
+
+        <div class="summary-grid">
+          <div class="summary-box">
+            <div id="sum-reps" class="summary-val">0</div>
+            <div class="summary-lbl">إجمالي العدات</div>
+          </div>
+          <div class="summary-box">
+            <div id="sum-time" class="summary-val">00:00</div>
+            <div class="summary-lbl">وقت التمرين</div>
+          </div>
+          <div class="summary-box">
+            <div id="sum-cals" class="summary-val">0</div>
+            <div class="summary-lbl">سعرة حرارية</div>
+          </div>
+          <div class="summary-box">
+            <div id="sum-form" class="summary-val">100%</div>
+            <div class="summary-lbl">دقة الأداء</div>
+          </div>
+        </div>
+
+        <button id="btn-close-summary" class="btn-primary-workout" style="width: 100%;">
+          <span>إغلاق والعودة</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Camera Permission & HTTPS Helper Modal for iOS -->
+    <div id="camera-permission-modal" class="permission-modal">
+      <div class="permission-card">
+        <div class="permission-title">
+          <span>📷</span>
+          <span>تفعيل الكاميرا على الآيفون</span>
+        </div>
+        <p class="permission-desc">
+          يشترط متصفح Safari على هواتف iPhone فتح الموقع عبر رابط مشفر (HTTPS) للسماح بتشغيل الكاميرا في الشبكة المحلية.
+        </p>
+
+        <div class="steps-box">
+          <div class="step-row">
+            <span class="step-num">1</span>
+            <span>اضغط الزر أدناه للانتقال للرابط الآمن المشفّر (منفذ 8443).</span>
+          </div>
+          <div class="step-row">
+            <span class="step-num">2</span>
+            <span>في سفاري، اضغط <strong>"إظهار التفاصيل" (Show Details)</strong> ثم اضغط <strong>"زيارة هذا الموقع" (Visit this website)</strong>.</span>
+          </div>
+          <div class="step-row">
+            <span class="step-num">3</span>
+            <span>اضغط <strong>"سماح" (Allow)</strong> عند طلب إذن الكاميرا.</span>
+          </div>
+        </div>
+
+        <a id="btn-open-https" href="https://192.168.18.189:8443/index.html" class="btn-https-link">
+          🔒 فتح الرابط المشفّر (HTTPS)
+        </a>
+        <button id="btn-dismiss-permission" class="btn-modal-dismiss">
+          إغلاق ومحاولة أخرى
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Scripts -->
+  <script src="audio-coach.js"></script>
+  <script src="pose-engine.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
