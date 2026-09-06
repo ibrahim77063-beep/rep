@@ -25,6 +25,12 @@ class PoseEngine {
     this.plankStartTime = null;
     this.plankSeconds = 0;
 
+    // Thermal & Battery Optimization (Prevents iPhone Overheating)
+    this.lastPoseTime = 0;
+    this.poseInterval = 55; // ~18 FPS (Perfect for fitness AI while keeping CPU/GPU cool)
+    this.isProcessing = false;
+    this.guideTick = 0; // Animation counter for green guide lines
+
     this.pose = null;
     this.stream = null;
     this.animationFrameId = null;
@@ -43,12 +49,13 @@ class PoseEngine {
       locateFile: (file) => `https://cdn.jsdelivr.net/npm/@mediapipe/pose/${file}`
     });
 
+    // Use modelComplexity: 0 (Lite model designed for phones to prevent overheating & save 70% battery)
     this.pose.setOptions({
-      modelComplexity: 1, // Fast on modern iPhone/Android
+      modelComplexity: 0, 
       smoothLandmarks: true,
       enableSegmentation: false,
-      minDetectionConfidence: 0.55,
-      minTrackingConfidence: 0.55
+      minDetectionConfidence: 0.5,
+      minTrackingConfidence: 0.5
     });
 
     this.pose.onResults((results) => this.onPoseResults(results));
@@ -95,13 +102,14 @@ class PoseEngine {
       this.video.setAttribute('webkit-playsinline', 'true');
       this.video.muted = true;
 
+      // Mobile Optimized constraints: 480x360 keeps the phone cool and battery lasting
       const constraints = {
         audio: false,
         video: {
           facingMode: this.facingMode,
-          width: { ideal: 640 },
-          height: { ideal: 480 },
-          frameRate: { ideal: 30 }
+          width: { ideal: 480 },
+          height: { ideal: 360 },
+          frameRate: { ideal: 24 }
         }
       };
 
@@ -119,8 +127,8 @@ class PoseEngine {
         };
       });
 
-      this.canvas.width = this.video.videoWidth || 640;
-      this.canvas.height = this.video.videoHeight || 480;
+      this.canvas.width = this.video.videoWidth || 480;
+      this.canvas.height = this.video.videoHeight || 360;
 
       this.isRunning = true;
       this.processVideo();
@@ -153,11 +161,23 @@ class PoseEngine {
     this.onStatusChange('stopped');
   }
 
+  // Throttled processing loop: keeps video 60 FPS smooth but paces AI inference to 18 FPS
   async processVideo() {
     if (!this.isRunning) return;
 
-    if (this.video.readyState >= 2 && this.pose) {
-      await this.pose.send({ image: this.video });
+    const now = performance.now();
+    if (now - this.lastPoseTime >= this.poseInterval && !this.isProcessing) {
+      if (this.video.readyState >= 2 && this.pose) {
+        this.lastPoseTime = now;
+        this.isProcessing = true;
+        try {
+          await this.pose.send({ image: this.video });
+        } catch (e) {
+          console.warn('Pose frame drop:', e);
+        } finally {
+          this.isProcessing = false;
+        }
+      }
     }
 
     this.animationFrameId = requestAnimationFrame(() => this.processVideo());
@@ -183,6 +203,7 @@ class PoseEngine {
 
     if (results.poseLandmarks) {
       this.drawGoldSkeleton(ctx, results.poseLandmarks, canvas.width, canvas.height);
+      this.drawDynamicGreenGuides(ctx, results.poseLandmarks, canvas.width, canvas.height);
       this.evaluateExercise(results.poseLandmarks);
     } else {
       this.onStatusChange('no_pose');
@@ -236,6 +257,142 @@ class PoseEngine {
         ctx.fill();
       }
     }
+  }
+
+  // Draw Animated Green Motion Guide Lines (خطوط وأسهم الإرشاد الخضراء المتحركة)
+  drawDynamicGreenGuides(ctx, lm, w, h) {
+    this.guideTick = (this.guideTick + 1) % 60;
+    const shift = (this.guideTick % 20) / 20; // 0 to 1 moving offset
+    const neonGreen = '#2ECC71';
+    const neonGreenGlow = 'rgba(46, 204, 113, 0.75)';
+
+    ctx.save();
+    ctx.lineWidth = 4;
+    ctx.shadowBlur = 14;
+    ctx.shadowColor = neonGreenGlow;
+    ctx.strokeStyle = neonGreen;
+    ctx.fillStyle = neonGreen;
+
+    const leftLegVis = (lm[23].visibility + lm[25].visibility + lm[27].visibility) / 3;
+    const rightLegVis = (lm[24].visibility + lm[26].visibility + lm[28].visibility) / 3;
+    const leftArmVis = (lm[11].visibility + lm[13].visibility + lm[15].visibility) / 3;
+    const rightArmVis = (lm[12].visibility + lm[14].visibility + lm[16].visibility) / 3;
+
+    // 1. SQUATS & DEADLIFTS GUIDES
+    if (this.currentExercise === 'squats' || this.currentExercise === 'deadlifts') {
+      const hip = leftLegVis > rightLegVis ? lm[23] : lm[24];
+      const knee = leftLegVis > rightLegVis ? lm[25] : lm[26];
+      if (hip.visibility > 0.4 && knee.visibility > 0.4) {
+        const hx = hip.x * w;
+        const hy = hip.y * h;
+        const ky = knee.y * h;
+
+        if (this.state === 'UP') {
+          // Guide down: Trainee needs to squat down!
+          const targetY = ky - 10;
+          this.drawArrow(ctx, hx - 25, hy + 10, hx - 25, targetY, shift);
+          this.drawArrow(ctx, hx + 25, hy + 10, hx + 25, targetY, shift);
+
+          // Target depth line at knee level
+          ctx.setLineDash([6, 6]);
+          ctx.beginPath();
+          ctx.moveTo(hx - 50, ky);
+          ctx.lineTo(hx + 50, ky);
+          ctx.stroke();
+          ctx.setLineDash([]);
+        } else {
+          // Guide up: Trainee reached depth, push back up!
+          this.drawArrow(ctx, hx - 25, ky, hx - 25, hy - 15, shift);
+          this.drawArrow(ctx, hx + 25, ky, hx + 25, hy - 15, shift);
+        }
+      }
+    }
+    // 2. BICEP CURLS GUIDES
+    else if (this.currentExercise === 'curls') {
+      const elbow = leftArmVis > rightArmVis ? lm[13] : lm[14];
+      const wrist = leftArmVis > rightArmVis ? lm[15] : lm[16];
+      const shoulder = leftArmVis > rightArmVis ? lm[11] : lm[12];
+
+      if (wrist.visibility > 0.4 && shoulder.visibility > 0.4) {
+        const wx = wrist.x * w;
+        const wy = wrist.y * h;
+        const sx = shoulder.x * w;
+        const sy = shoulder.y * h;
+
+        if (this.state === 'DOWN') {
+          // Guide curl upwards
+          this.drawArrow(ctx, wx, wy - 5, sx, sy + 15, shift);
+        } else {
+          // Guide arm extending down
+          this.drawArrow(ctx, sx, sy + 15, wx, wy + 20, shift);
+        }
+      }
+    }
+    // 3. PUSH-UPS & TRICEP DIPS GUIDES
+    else if (this.currentExercise === 'pushups' || this.currentExercise === 'tricep_dips') {
+      const shoulder = leftArmVis > rightArmVis ? lm[11] : lm[12];
+      if (shoulder.visibility > 0.4) {
+        const sx = shoulder.x * w;
+        const sy = shoulder.y * h;
+        if (this.state === 'UP') {
+          this.drawArrow(ctx, sx, sy, sx, sy + 50, shift);
+        } else {
+          this.drawArrow(ctx, sx, sy, sx, sy - 50, shift);
+        }
+      }
+    }
+    // 4. OVERHEAD SHOULDER PRESS
+    else if (this.currentExercise === 'shoulder_press') {
+      const wrist = leftArmVis > rightArmVis ? lm[15] : lm[16];
+      if (wrist.visibility > 0.4) {
+        const wx = wrist.x * w;
+        const wy = wrist.y * h;
+        if (this.state === 'DOWN') {
+          this.drawArrow(ctx, wx, wy, wx, wy - 70, shift);
+        } else {
+          this.drawArrow(ctx, wx, wy, wx, wy + 60, shift);
+        }
+      }
+    }
+    // 5. LATERAL RAISES
+    else if (this.currentExercise === 'lateral_raises') {
+      const elbow = leftArmVis > rightArmVis ? lm[13] : lm[14];
+      const hip = leftLegVis > rightLegVis ? lm[23] : lm[24];
+      if (elbow.visibility > 0.4 && hip.visibility > 0.4) {
+        const ex = elbow.x * w;
+        const ey = elbow.y * h;
+        if (this.state === 'DOWN') {
+          this.drawArrow(ctx, ex, ey, ex + (leftArmVis > rightArmVis ? -40 : 40), ey - 40, shift);
+        } else {
+          this.drawArrow(ctx, ex, ey, ex, ey + 40, shift);
+        }
+      }
+    }
+
+    ctx.restore();
+  }
+
+  // Draw moving guide arrow along vector
+  drawArrow(ctx, fromX, fromY, toX, toY, shift) {
+    const dx = toX - fromX;
+    const dy = toY - fromY;
+    const angle = Math.atan2(dy, dx);
+    const headlen = 12;
+
+    ctx.beginPath();
+    ctx.moveTo(fromX, fromY);
+    ctx.lineTo(toX, toY);
+    ctx.stroke();
+
+    const headX = fromX + dx * (0.4 + shift * 0.55);
+    const headY = fromY + dy * (0.4 + shift * 0.55);
+
+    ctx.beginPath();
+    ctx.moveTo(headX, headY);
+    ctx.lineTo(headX - headlen * Math.cos(angle - Math.PI / 6), headY - headlen * Math.sin(angle - Math.PI / 6));
+    ctx.lineTo(headX - headlen * Math.cos(angle + Math.PI / 6), headY - headlen * Math.sin(angle + Math.PI / 6));
+    ctx.closePath();
+    ctx.fill();
   }
 
   // Comprehensive Exercise Library with State Machines

@@ -34,6 +34,8 @@
       </div>
 
       <div class="header-actions">
+        <!-- Exercise Guide Button -->
+        <button id="btn-exercise-guide" class="icon-btn" title="دليل طريقة أداء التمرين" style="font-weight: 900; font-size: 0.95rem;">ℹ️</button>
         <!-- Language Switcher -->
         <button id="btn-toggle-lang" class="icon-btn" title="تغيير اللغة" style="font-weight: 800; font-size: 0.8rem;">AR</button>
         <!-- Sound Mute/Unmute -->
@@ -259,6 +261,42 @@
         </a>
         <button id="btn-dismiss-permission" class="btn-modal-dismiss">
           إغلاق ومحاولة أخرى
+        </button>
+      </div>
+    </div>
+
+    <!-- Exercise Guide & How-to-Perform Modal -->
+    <div id="exercise-guide-modal" class="permission-modal">
+      <div class="permission-card" style="max-height: 85vh; overflow-y: auto;">
+        <div class="permission-title">
+          <span id="guide-modal-icon">ℹ️</span>
+          <span id="guide-modal-title">طريقة الأداء الصحيح</span>
+        </div>
+
+        <div style="background: rgba(46, 204, 113, 0.12); border: 1px solid rgba(46, 204, 113, 0.4); border-radius: 12px; padding: 10px; margin-bottom: 14px; font-size: 0.82rem; color: #2ECC71;">
+          🟢 <strong>ملاحظة هامة:</strong> ستظهر خطوط وأسهم خضراء متحركة فوق جسمك على الشاشة توضح لك اتجاه ومسار الحركة الصحيح أثناء التمرين!
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <h4 style="color: var(--gold-bright); font-size: 0.95rem; margin-bottom: 6px;">📋 خطوات التمرين:</h4>
+          <ul id="guide-steps-list" style="padding-right: 20px; font-size: 0.85rem; color: #DDD; line-height: 1.6;">
+            <!-- Dynamic steps -->
+          </ul>
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <h4 style="color: #FF6B6B; font-size: 0.95rem; margin-bottom: 6px;">⚠️ أخطاء شائعة تجنبها:</h4>
+          <ul id="guide-mistakes-list" style="padding-right: 20px; font-size: 0.85rem; color: #FF9E9E; line-height: 1.6;">
+            <!-- Dynamic mistakes -->
+          </ul>
+        </div>
+
+        <div style="margin-bottom: 16px; font-size: 0.85rem; color: var(--gold-bright);">
+          🎯 <strong>الزاوية المستهدفة:</strong> <span id="guide-target-angle">90 درجة للركبة</span>
+        </div>
+
+        <button id="btn-close-guide" class="btn-primary-workout" style="width: 100%; padding: 12px; font-size: 1rem;">
+          <span>فهمت الطريقة! لنبدأ الآن 🚀</span>
         </button>
       </div>
     </div>

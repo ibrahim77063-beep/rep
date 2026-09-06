@@ -41,20 +41,163 @@ document.addEventListener('DOMContentLoaded', () => {
   let currentExerciseKey = 'squats';
   let perfectRepsCount = 0;
 
-  // Expanded Exercise Database (12 exercises across 3 body categories)
+  // Expanded Exercise Database (12 exercises with form guides and mistake prevention)
   const EXERCISES_DB = {
-    squats: { nameAr: '🦵 سكوات (Squats)', nameEn: 'Squats', cat: 'lower', calFactor: 0.35, unitAr: 'تكرار', unitEn: 'Reps' },
-    lunges: { nameAr: '🚶‍♂️ طعنات (Lunges)', nameEn: 'Lunges', cat: 'lower', calFactor: 0.32, unitAr: 'تكرار', unitEn: 'Reps' },
-    deadlifts: { nameAr: '🏋️ رفعة ميتة (Deadlifts)', nameEn: 'Deadlifts', cat: 'lower', calFactor: 0.40, unitAr: 'تكرار', unitEn: 'Reps' },
-    pushups: { nameAr: '💪 تمرين الضغط (Push-ups)', nameEn: 'Push-ups', cat: 'upper', calFactor: 0.45, unitAr: 'تكرار', unitEn: 'Reps' },
-    curls: { nameAr: '🦾 بايسبس (Bicep Curls)', nameEn: 'Bicep Curls', cat: 'upper', calFactor: 0.20, unitAr: 'تكرار', unitEn: 'Reps' },
-    shoulder_press: { nameAr: '🏋️‍♂️ ضغط أكتاف (Shoulder Press)', nameEn: 'Shoulder Press', cat: 'upper', calFactor: 0.30, unitAr: 'تكرار', unitEn: 'Reps' },
-    lateral_raises: { nameAr: '🦅 رفرفة أكتاف (Lateral Raises)', nameEn: 'Lateral Raises', cat: 'upper', calFactor: 0.22, unitAr: 'تكرار', unitEn: 'Reps' },
-    tricep_dips: { nameAr: '⚡ ترايسبس (Tricep Dips)', nameEn: 'Tricep Dips', cat: 'upper', calFactor: 0.35, unitAr: 'تكرار', unitEn: 'Reps' },
-    crunches: { nameAr: '🍫 تمارين المعدة (Crunches)', nameEn: 'Crunches', cat: 'core', calFactor: 0.25, unitAr: 'تكرار', unitEn: 'Reps' },
-    leg_raises: { nameAr: '📐 رفع الأرجل (Leg Raises)', nameEn: 'Leg Raises', cat: 'core', calFactor: 0.28, unitAr: 'تكرار', unitEn: 'Reps' },
-    jacks: { nameAr: '⭐ قفز نجمي (Jumping Jacks)', nameEn: 'Jumping Jacks', cat: 'core', calFactor: 0.25, unitAr: 'تكرار', unitEn: 'Reps' },
-    plank: { nameAr: '⏱️ بلانك (Plank Hold)', nameEn: 'Plank', cat: 'core', calFactor: 0.15, unitAr: 'ثانية', unitEn: 'Seconds' }
+    squats: {
+      nameAr: '🦵 سكوات (Squats)', nameEn: 'Squats', cat: 'lower', calFactor: 0.35, unitAr: 'تكرار', unitEn: 'Reps',
+      targetAngle: '90° (مستوى الفخذ موازي للأرض)',
+      steps: [
+        'قف بتباعد القدمين بمحاذاة الكتفين مع توجيه أصابع القدم للخارج قليلاً.',
+        'انزل بالحوض للخلف والأسفل كأنك تجلس على كرسي حتى تصل لزاوية 90° باتباع الأسهم الخضراء.',
+        'ادفع بكعبيك للأعلى للعودة لوضع البداية مع الزفير.'
+      ],
+      mistakes: [
+        'لا تجعل ركبتيك تتقاربان للداخل أثناء الصعود.',
+        'حافظ على استقامة ظهرك وصدرك مرفوعاً للأعلى دون تقوس.'
+      ]
+    },
+    lunges: {
+      nameAr: '🚶‍♂️ طعنات (Lunges)', nameEn: 'Lunges', cat: 'lower', calFactor: 0.32, unitAr: 'تكرار', unitEn: 'Reps',
+      targetAngle: '90° للركبتين',
+      steps: [
+        'اخطُ خطوة واسعة للأمام بساق واحدة.',
+        'انزل بجسمك عمودياً حتى تنثني الركبتان بزاوية 90° باتباع السهم الأخضر.',
+        'ادفع بالساق الأمامية للعودة لوضع البداية.'
+      ],
+      mistakes: [
+        'لا تدع ركبتك الأمامية تتقدم كثيراً فوق أصابع القدم.',
+        'حافظ على جذعك عمودياً دون ميل مفرط للأمام.'
+      ]
+    },
+    deadlifts: {
+      nameAr: '🏋️ رفعة ميتة (Deadlifts)', nameEn: 'Deadlifts', cat: 'lower', calFactor: 0.40, unitAr: 'تكرار', unitEn: 'Reps',
+      targetAngle: '100° ثني الحوض',
+      steps: [
+        'قف وقدماك باتساع الحوض مع ثني طفيف جداً في الركبتين.',
+        'ادفع حوضك ومؤخرتك للخلف مع النزول بالجذع لأسفل مع ظهر مفرود تماماً.',
+        'اقبض عضلات الحوض وادفع للأمام للعودة للوقوف الكامل.'
+      ],
+      mistakes: [
+        'احذر تماماً من تقويس أو تحنيب أسفل الظهر.',
+        'لا تعتمد على عضلات الذراع لرفع الوزن، القوة تأتي من الحوض والأرجل.'
+      ]
+    },
+    pushups: {
+      nameAr: '💪 تمرين الضغط (Push-ups)', nameEn: 'Push-ups', cat: 'upper', calFactor: 0.45, unitAr: 'تكرار', unitEn: 'Reps',
+      targetAngle: '85° نزول الكوع',
+      steps: [
+        'ضع يديك على الأرض باتساع أكبر قليلاً من الكتفين.',
+        'حافظ على استقامة جسمك كقطعة واحدة من الرأس حتى الكعبين.',
+        'انزل بصدرك نحو الأرض باتباع الأسهم الخضراء حتى ينثني الكوع 90° ثم ادفع للأعلى.'
+      ],
+      mistakes: [
+        'لا تدع وسطك أو حوضك يهبط لأسفل.',
+        'لا تفتح كوعيك للخارج بزاوية 90° مع الكتف (اجعلهما بزاوية 45° لحماية المفصل).'
+      ]
+    },
+    curls: {
+      nameAr: '🦾 بايسبس (Bicep Curls)', nameEn: 'Bicep Curls', cat: 'upper', calFactor: 0.20, unitAr: 'تكرار', unitEn: 'Reps',
+      targetAngle: '45° ثني الذراع كاملاً',
+      steps: [
+        'قف ثابتاً مع تثبيت الكوعين بجانب خصرك.',
+        'اثنِ ذراعيك للأعلى باتباع القوس الأخضر حتى تقبض عضلة البايسبس بقوة.',
+        'انزل بالوزن ببطء وتحكم حتى يمتد الذراع بالكامل (160°).'
+      ],
+      mistakes: [
+        'لا تؤرجح ظهرك أو تدفع خصرك للمساعدة في رفع الوزن.',
+        'لا تحرك كوعك للأمام أو الخلف أثناء الصعود.'
+      ]
+    },
+    shoulder_press: {
+      nameAr: '🏋️‍♂️ ضغط أكتاف (Shoulder Press)', nameEn: 'Shoulder Press', cat: 'upper', calFactor: 0.30, unitAr: 'تكرار', unitEn: 'Reps',
+      targetAngle: '160° امتداد الذراعين للأعلى',
+      steps: [
+        'ابدأ والوزن بمحاذاة أذنيك والكوعان مثنيان 90°.',
+        'ادفع الوزن عمودياً للأعلى فوق رأسك باتباع الأسهم الخضراء حتى تمتد الأذرع.',
+        'انزل بالوزن ببطء وتحكم لمستوى البداية.'
+      ],
+      mistakes: [
+        'لا تقوّس أسفل ظهرك للخلف بشكل مفرط.',
+        'لا تغلق مفصل الكوع بقوة زائدة عند القمة (Lockout).'
+      ]
+    },
+    lateral_raises: {
+      nameAr: '🦅 رفرفة أكتاف (Lateral Raises)', nameEn: 'Lateral Raises', cat: 'upper', calFactor: 0.22, unitAr: 'تكرار', unitEn: 'Reps',
+      targetAngle: '85° محاذاة الذراع مع الكتف',
+      steps: [
+        'ابدأ والذراعان بجانب فخذيك مع انحناء طفيف في الكوع.',
+        'ارفع ذراعيك للجانبين كأجنحة النسر باتباع الأسهم الخضراء حتى تصبح بمستوى الكتف.',
+        'انزل بالذراعين بهدوء مع الحفاظ على التحكم.'
+      ],
+      mistakes: [
+        'لا ترفع الوزن فوق مستوى الكتفين لتجنب إجهاد أوتار الكتف.',
+        'لا تستخدم قوة الدفع أو هز الجذع.'
+      ]
+    },
+    tricep_dips: {
+      nameAr: '⚡ ترايسبس (Tricep Dips)', nameEn: 'Tricep Dips', cat: 'upper', calFactor: 0.35, unitAr: 'تكرار', unitEn: 'Reps',
+      targetAngle: '90° ثني الكوع للخلف',
+      steps: [
+        'استند بيديك خلفك على كرسي أو حافة ثابتة.',
+        'انزل بالحوض للأسفل مع ثني الكوعين للخلف باتباع الأسهم الخضراء حتى 90°.',
+        'ادفع بقوة عضلات الترايسبس للعودة للأعلى.'
+      ],
+      mistakes: [
+        'لا تبتعد بحوضك كثيراً للأمام بعيداً عن حافة المقعد.',
+        'لا تنزل أكثر من 90° لحماية الكتف من الإجهاد.'
+      ]
+    },
+    crunches: {
+      nameAr: '🍫 تمارين المعدة (Crunches)', nameEn: 'Crunches', cat: 'core', calFactor: 0.25, unitAr: 'تكرار', unitEn: 'Reps',
+      targetAngle: '80° ثني عضلات البطن',
+      steps: [
+        'استلقِ على ظهرك واثنِ ركبتيك مع وضع اليدين بجانب الرأس دون شده.',
+        'اقبض عضلات بطنك وارفع لوحي كتفيك عن الأرض نحو ركبتيك.',
+        'انزل ببطء للتحكم بالهبوط دون ارتخاء كامل.'
+      ],
+      mistakes: [
+        'لا تشد رقبتك أو رأسك بيديك للأمام (القوة تأتي من البطن فقط).',
+        'لا ترفع كامل ظهرك من الأرض، يكفي رفع أعلى الظهر.'
+      ]
+    },
+    leg_raises: {
+      nameAr: '📐 رفع الأرجل (Leg Raises)', nameEn: 'Leg Raises', cat: 'core', calFactor: 0.28, unitAr: 'تكرار', unitEn: 'Reps',
+      targetAngle: '95° رفع الساقين عمودياً',
+      steps: [
+        'استلقِ مستوياً على ظهرك وضع يديك تحت حوضك لتثبيت أسفل الظهر.',
+        'ارفع ساقيك معاً وهما مفرودتان للأعلى بزاوية 90° باتباع الأسهم الخضراء.',
+        'انزل بالساقين ببطء دون أن تلمسا الأرض ثم ارفعهما مجدداً.'
+      ],
+      mistakes: [
+        'لا تدع أسفل ظهرك يتقوس أو يرتفع عن الأرض أثناء النزول.',
+        'لا تعتمد على قوة الاندفاع والأرجحة السريعة.'
+      ]
+    },
+    jacks: {
+      nameAr: '⭐ قفز نجمي (Jumping Jacks)', nameEn: 'Jumping Jacks', cat: 'core', calFactor: 0.25, unitAr: 'تكرار', unitEn: 'Reps',
+      targetAngle: 'فتح الذراعين والساقين كاملاً',
+      steps: [
+        'ابدأ بالوقوف وقدماك متقاربتان والذراعان بجانبك.',
+        'اقفز وافتح ساقيك للجانبين وارفع يديك فوق رأسك بالتزامن.',
+        'اقفز مجدداً للعودة لوضع البداية بسلاسة وإيقاع منتظم.'
+      ],
+      mistakes: [
+        'اهبط دائماً على مشط قدميك برفق لامتصاص الصدمات وحماية الركبتين.'
+      ]
+    },
+    plank: {
+      nameAr: '⏱️ بلانك (Plank Hold)', nameEn: 'Plank', cat: 'core', calFactor: 0.15, unitAr: 'ثانية', unitEn: 'Seconds',
+      targetAngle: '170°-180° استقامة الجسم الكاملة',
+      steps: [
+        'استند على ساعديك وأطراف أصابع قدميك.',
+        'شد عضلات البطن والأرداف للحفاظ على خط مستقيم من رأسك لكعبيك.',
+        'تنفس بهدوء واستمر في وضعية الثبات لأطول فترة ممكنة.'
+      ],
+      mistakes: [
+        'لا تدع حوضك يهبط لأسفل (يسبب ألماً في الظهر).',
+        'لا ترفع مؤخرتك للأعلى بشكل مثلث.'
+      ]
+    }
   };
 
   const repUnitEl = document.querySelector('.rep-unit');
@@ -254,6 +397,42 @@ document.addEventListener('DOMContentLoaded', () => {
     btnDismissPermission.addEventListener('click', () => {
       const permModal = document.getElementById('camera-permission-modal');
       if (permModal) permModal.classList.remove('show');
+    });
+  }
+
+  // Exercise Form Guide Modal (دليل الأداء الصحيح)
+  const btnExerciseGuide = document.getElementById('btn-exercise-guide');
+  const guideModal = document.getElementById('exercise-guide-modal');
+  const btnCloseGuide = document.getElementById('btn-close-guide');
+  const guideModalTitle = document.getElementById('guide-modal-title');
+  const guideStepsList = document.getElementById('guide-steps-list');
+  const guideMistakesList = document.getElementById('guide-mistakes-list');
+  const guideTargetAngle = document.getElementById('guide-target-angle');
+
+  function openExerciseGuide(exKey) {
+    const data = EXERCISES_DB[exKey] || EXERCISES_DB.squats;
+    if (guideModalTitle) guideModalTitle.textContent = data.nameAr;
+    if (guideTargetAngle) guideTargetAngle.textContent = data.targetAngle || '90°';
+
+    if (guideStepsList) {
+      guideStepsList.innerHTML = (data.steps || []).map(step => `<li>${step}</li>`).join('');
+    }
+    if (guideMistakesList) {
+      guideMistakesList.innerHTML = (data.mistakes || []).map(m => `<li>${m}</li>`).join('');
+    }
+
+    if (guideModal) guideModal.classList.add('show');
+  }
+
+  if (btnExerciseGuide) {
+    btnExerciseGuide.addEventListener('click', () => {
+      openExerciseGuide(currentExerciseKey);
+    });
+  }
+
+  if (btnCloseGuide) {
+    btnCloseGuide.addEventListener('click', () => {
+      if (guideModal) guideModal.classList.remove('show');
     });
   }
 
