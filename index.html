@@ -1,0 +1,1007 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+  <meta name="description" content="AI gym - تطبيق ذكي لعد تمارين اللياقة والتكرارات بالذكاء الاصطناعي مع مدرب صوتي تحفيزي وفحص الأجسام - م. إبراهيم البنا">
+  <title>AI gym - مدرب اللياقة الذكي</title>
+
+  <!-- PWA & iOS Safari Optimizations -->
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="AI gym">
+  <meta name="theme-color" content="#070709">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" type="image/jpeg" href="icons/logo.jpg">
+  <link rel="apple-touch-icon" href="icons/logo.jpg">
+
+  <!-- Stylesheet -->
+  <link rel="stylesheet" href="style.css?v=3.0">
+
+  <!-- MediaPipe Pose Libraries -->
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@mediapipe/pose/pose.js" crossorigin="anonymous"></script>
+</head>
+<body>
+
+  <div class="app-viewport">
+
+    <!-- Top Header (Clean & Uncluttered) -->
+    <header class="app-header">
+      <div class="brand-badge">
+        <img src="icons/logo.jpg" alt="AI gym Logo" class="brand-logo-img">
+        <div class="brand-details">
+          <div class="brand-name">AI gym</div>
+          <div class="brand-sub">م. إبراهيم البنا</div>
+        </div>
+      </div>
+
+      <div class="header-actions">
+        <!-- Voice Command Button -->
+        <button id="btn-voice-control" class="icon-btn voice-control-btn" title="التحكم الصوتي (ابدأ / قف)">
+          <span class="voice-mic-icon">🎙️</span>
+          <span class="voice-pulse-ring"></span>
+        </button>
+
+        <!-- Sidebar Menu Toggle Button -->
+        <button id="btn-open-sidebar" class="icon-btn-menu" title="القائمة الرئيسية واللوحات" aria-label="فتح القائمة الجانبية">
+          <span class="hamburger-bar"></span>
+          <span class="hamburger-bar"></span>
+          <span class="hamburger-bar"></span>
+        </button>
+      </div>
+    </header>
+
+    <!-- Camera Viewport -->
+    <main class="camera-stage">
+      <video id="webcam" playsinline webkit-playsinline muted autoplay></video>
+      <canvas id="output_canvas"></canvas>
+    </main>
+
+    <!-- Interactive Heads-Up Display (HUD) -->
+    <div class="hud-overlay">
+
+      <!-- Top Stats Bar -->
+      <div class="stats-bar">
+        <div class="stat-chip">
+          <span class="stat-label">المؤقت</span>
+          <span id="workout-timer" class="stat-value">00:00</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-label">سعرة حرارية</span>
+          <span id="calories-burned" class="stat-value">0</span>
+        </div>
+        <div class="stat-chip">
+          <span class="stat-label">دقة الحركة</span>
+          <span id="form-score" class="stat-value">100%</span>
+        </div>
+      </div>
+
+      <!-- Secondary Telemetry HUD (Ghost, Tempo TUT, Active Routine) -->
+      <div class="hud-telemetry-row">
+        <div id="hud-routine-pill" class="hud-pill" style="display: none;">
+          <span class="hud-pill-icon">📋</span>
+          <span id="hud-routine-text">الروتين: جولة 1/3</span>
+        </div>
+        <div id="hud-ghost-pill" class="hud-pill hud-ghost" style="display: none;">
+          <span class="hud-pill-icon">👻</span>
+          <span id="hud-ghost-text">الشبح: 0 | أنت: 0</span>
+        </div>
+        <div id="hud-tempo-pill" class="hud-pill hud-tempo">
+          <span class="hud-pill-icon">⏱️</span>
+          <span id="hud-tempo-text">الإيقاع: 0.0s</span>
+        </div>
+      </div>
+
+      <!-- Center Big Rep Ring -->
+      <div class="center-counter-zone">
+        <div class="counter-ring-wrapper">
+          <svg class="counter-ring-svg" viewBox="0 0 170 170">
+            <defs>
+              <linearGradient id="goldGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                <stop offset="0%" stop-color="#FFE898" />
+                <stop offset="50%" stop-color="#D4AF37" />
+                <stop offset="100%" stop-color="#9A7B1C" />
+              </linearGradient>
+            </defs>
+            <circle class="ring-bg" cx="85" cy="85" r="75"></circle>
+            <circle id="ring-progress" class="ring-progress" cx="85" cy="85" r="75"></circle>
+          </svg>
+
+          <div class="counter-core">
+            <div id="rep-count" class="rep-number">0</div>
+            <div class="rep-unit">تكرار</div>
+          </div>
+        </div>
+
+        <div id="state-badge" class="state-badge">
+          <span class="state-dot"></span>
+          <span id="state-text">جاهز (Ready)</span>
+        </div>
+      </div>
+
+      <!-- Coach Toast Encouragement -->
+      <div id="coach-toast" class="coach-toast">
+        <span>⚡</span>
+        <span id="coach-toast-text">استعد للبدء!</span>
+      </div>
+
+    </div>
+
+    <!-- Bottom Controls & Navigation -->
+    <footer class="bottom-controls">
+      <!-- Exercise Category Filter Tabs -->
+      <div class="category-tabs">
+        <button class="cat-tab active" data-cat="all">🌟 الكل (12)</button>
+        <button class="cat-tab" data-cat="upper">💪 الجزء العلوي</button>
+        <button class="cat-tab" data-cat="lower">🦵 الجزء السفلي</button>
+        <button class="cat-tab" data-cat="core">🔥 البطن والكارديو</button>
+        <button class="cat-tab" data-cat="custom" id="tab-custom-exercises">⭐ خاصة</button>
+        <button id="btn-open-custom-builder" class="cat-tab" style="background: var(--gold-gradient); color: #08080A; font-weight: 900;" title="صانع التمارين">➕ تمرين خاص</button>
+      </div>
+
+      <!-- Exercise Selector Chips (12 Comprehensive Exercises) -->
+      <div class="exercise-scroll-chips" id="exercise-chips-container">
+        <!-- Lower Body -->
+        <button class="chip-btn active" data-exercise="squats" data-cat="lower">🦵 سكوات (Squats)</button>
+        <button class="chip-btn" data-exercise="lunges" data-cat="lower">🚶‍♂️ طعنات (Lunges)</button>
+        <button class="chip-btn" data-exercise="deadlifts" data-cat="lower">🏋️ رفعة ميتة (Deadlifts)</button>
+        
+        <!-- Upper Body -->
+        <button class="chip-btn" data-exercise="pushups" data-cat="upper">💪 تمرين الضغط (Push-ups)</button>
+        <button class="chip-btn" data-exercise="curls" data-cat="upper">🦾 بايسبس (Bicep Curls)</button>
+        <button class="chip-btn" data-exercise="shoulder_press" data-cat="upper">🏋️‍♂️ ضغط أكتاف (Shoulder Press)</button>
+        <button class="chip-btn" data-exercise="lateral_raises" data-cat="upper">🦅 رفرفة جانبي (Lateral Raises)</button>
+        <button class="chip-btn" data-exercise="tricep_dips" data-cat="upper">⚡ ترايسبس ديبس (Tricep Dips)</button>
+        
+        <!-- Core & Cardio -->
+        <button class="chip-btn" data-exercise="crunches" data-cat="core">🍫 تمارين المعدة (Crunches)</button>
+        <button class="chip-btn" data-exercise="leg_raises" data-cat="core">📐 رفع الأرجل (Leg Raises)</button>
+        <button class="chip-btn" data-exercise="jacks" data-cat="core">⭐ قفز نجمي (Jumping Jacks)</button>
+        <button class="chip-btn" data-exercise="plank" data-cat="core">⏱️ بلانك ثبات (Plank Hold)</button>
+      </div>
+
+      <!-- Action Row -->
+      <div class="action-row">
+        <!-- Start / Stop Button -->
+        <button id="btn-start-workout" class="btn-primary-workout">
+          <svg width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z"/>
+          </svg>
+          <span>بدء التمرين</span>
+        </button>
+
+        <!-- Reset Button -->
+        <button id="btn-reset" class="btn-secondary" title="تصفير العداد">
+          <svg width="22" height="22" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M17.65 6.35C16.2 4.9 14.21 4 12 4c-4.42 0-7.99 3.58-7.99 8s3.57 8 7.99 8c3.73 0 6.84-2.55 7.73-6h-2.08c-.82 2.33-3.04 4-5.65 4-3.31 0-6-2.69-6-6s2.69-6 6-6c1.66 0 3.14.69 4.22 1.78L13 11h7V4l-2.35 2.35z"/>
+          </svg>
+        </button>
+      </div>
+    </footer>
+
+    <!-- ============================================================ -->
+    <!-- AI GYM SIDEBAR DRAWER (القائمة الجانبية المتقدمة) -->
+    <!-- ============================================================ -->
+    <div id="sidebar-backdrop" class="sidebar-backdrop"></div>
+    <aside id="app-sidebar" class="app-sidebar" aria-hidden="true">
+      <!-- Sidebar Header -->
+      <div class="sidebar-header">
+        <div class="sidebar-brand">
+          <img src="icons/logo.jpg" alt="AI gym Logo" class="sidebar-brand-img">
+          <div>
+            <div class="sidebar-title">AI gym <span class="vip-tag">PRO</span></div>
+            <div class="sidebar-dev-tag">إشراف: م. إبراهيم البنا</div>
+          </div>
+        </div>
+        <button id="btn-close-sidebar" class="sidebar-close-btn" title="إغلاق القائمة">✕</button>
+      </div>
+
+      <!-- Navigation Tabs -->
+      <nav class="sidebar-nav-tabs">
+        <button class="sidebar-tab-btn active" data-tab="dashboard">
+          <span class="tab-icon">📊</span>
+          <span class="tab-label">الداش بورد</span>
+        </button>
+        <button class="sidebar-tab-btn" data-tab="coach">
+          <span class="tab-icon">🤖</span>
+          <span class="tab-label">المدرب الذكي</span>
+        </button>
+        <button class="sidebar-tab-btn" data-tab="bodyscan">
+          <span class="tab-icon">🦾</span>
+          <span class="tab-label">فحص الجسم</span>
+        </button>
+        <button class="sidebar-tab-btn" data-tab="settings">
+          <span class="tab-icon">⚙️</span>
+          <span class="tab-label">الإعدادات</span>
+        </button>
+        <button class="sidebar-tab-btn" data-tab="dev">
+          <span class="tab-icon">🛠️</span>
+          <span class="tab-label">المطور</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Body Content Panels -->
+      <div class="sidebar-body">
+
+        <!-- TAB 1: الداش بورد الرئيسي (Dashboard) -->
+        <div id="tab-dashboard" class="sidebar-panel active">
+          <div class="panel-section-title">
+            <span>📈</span>
+            <span>لوحة المؤشرات والإحصائيات</span>
+          </div>
+
+          <!-- Quick Metrics 2x2 Grid -->
+          <div class="dash-metrics-grid">
+            <div class="dash-metric-card">
+              <div class="metric-icon">🔥</div>
+              <div class="metric-num" id="dash-total-reps">0</div>
+              <div class="metric-label">إجمالي العدات</div>
+            </div>
+            <div class="dash-metric-card">
+              <div class="metric-icon">⚡</div>
+              <div class="metric-num" id="dash-total-calories">0</div>
+              <div class="metric-label">سعرة محروقة</div>
+            </div>
+            <div class="dash-metric-card">
+              <div class="metric-icon">⏱️</div>
+              <div class="metric-num" id="dash-total-time">00:00</div>
+              <div class="metric-label">وقت التمرين</div>
+            </div>
+            <div class="dash-metric-card">
+              <div class="metric-icon">🎯</div>
+              <div class="metric-num" id="dash-avg-form">100%</div>
+              <div class="metric-label">متوسط الدقة</div>
+            </div>
+          </div>
+
+          <!-- Daily Target Card -->
+          <div class="dash-card">
+            <div class="card-header-flex">
+              <span class="card-title">🎯 الهدف اليومي للتكرارات</span>
+              <span id="dash-daily-progress-text" class="card-badge">0 / 100 تكرار</span>
+            </div>
+            <div class="progress-track">
+              <div id="dash-daily-progress-bar" class="progress-fill" style="width: 0%;"></div>
+            </div>
+          </div>
+
+          <!-- Routine & Schedule Shortcut Card -->
+          <div class="dash-card">
+            <div class="card-header-flex">
+              <span class="card-title">📅 الجدول التدريبي الأسبوعي</span>
+              <span class="card-badge gold">مفعّل</span>
+            </div>
+            <p class="card-desc">اختر روتينك أو اتبع برنامجك التدريبي المجدول مع تنبيهات وفيديوهات شرح يوتيوب.</p>
+            <button id="btn-open-routines" class="btn-sidebar-action">
+              <span>📅 فتح مدير الجداول والروتينات</span>
+            </button>
+          </div>
+
+          <!-- Workout History Log -->
+          <div class="dash-card">
+            <div class="card-header-flex">
+              <span class="card-title">📋 سجل الجلسات السابقة</span>
+              <span id="dash-history-count" class="card-sub-tag">0 جلسات</span>
+            </div>
+            <div id="dash-workout-history-list" class="workout-history-list">
+              <div class="empty-history-msg">لا توجد جلسات سابقة بعد. ابدأ تمرينك الأول الآن!</div>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 2: المدرب الشخصي الذكي (AI Coach) -->
+        <div id="tab-coach" class="sidebar-panel">
+          <div class="panel-section-title">
+            <span>🤖</span>
+            <span>المدرب الشخصي الصوتي الذكي</span>
+          </div>
+
+          <!-- Coach Hero Card -->
+          <div class="coach-hero-card">
+            <div class="coach-avatar-zone">
+              <div class="coach-avatar-ring">
+                <span class="coach-avatar-emoji">👑</span>
+              </div>
+              <div>
+                <div class="coach-title">كابتن AI gym الذكي</div>
+                <div class="coach-status-tag">🟢 متصل ومستعد للتدريب</div>
+              </div>
+            </div>
+            <p class="coach-hero-quote">"القوة الحقيقية تبدأ عندما تشعر بالتعب وتستمر في العدّ!"</p>
+          </div>
+
+          <!-- Coach Persona Selector -->
+          <div class="dash-card">
+            <span class="card-title">🎭 اختر أسلوب وشخصية المدرب:</span>
+            <div class="coach-personas-grid">
+              <button class="persona-btn active" data-persona="beast">
+                <span class="persona-icon">🔥</span>
+                <span class="persona-name">الحماسي الناري</span>
+                <span class="persona-desc">تحفيز عالي وطاقة انفجارية</span>
+              </button>
+              <button class="persona-btn" data-persona="zen">
+                <span class="persona-icon">🧘‍♂️</span>
+                <span class="persona-name">المتزن والمشجع</span>
+                <span class="persona-desc">توجيه هادئ وتشجيع إيجابي</span>
+              </button>
+              <button class="persona-btn" data-persona="strict">
+                <span class="persona-icon">📐</span>
+                <span class="persona-name">دقة التكنيك</span>
+                <span class="persona-desc">تركيز صارم على الزوايا والمفاصل</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Speech & Audio Settings -->
+          <div class="dash-card">
+            <span class="card-title">🔊 خيارات التوجيه الصوتي:</span>
+            <div class="setting-row">
+              <label>سرعة نطق المدرب:</label>
+              <div class="slider-wrapper">
+                <input type="range" id="coach-speech-rate" min="0.8" max="1.3" step="0.1" value="1.0">
+                <span id="coach-speech-rate-val">1.0x</span>
+              </div>
+            </div>
+            <div class="setting-row">
+              <label>تردد التشجيع أثناء العد:</label>
+              <select id="coach-frequency-select" class="sidebar-select">
+                <option value="every">كل عدة (تشجيع مستمر)</option>
+                <option value="every3" selected>كل 3 عدات</option>
+                <option value="super">عند العدات الخارقة فقط</option>
+              </select>
+            </div>
+
+            <button id="btn-test-coach-voice" class="btn-sidebar-secondary" style="margin-top: 10px;">
+              <span>🔊 تجربة صوت المدرب الصوتي الآن</span>
+            </button>
+          </div>
+
+          <!-- Live Tip Card -->
+          <div class="dash-card" style="border-color: rgba(46, 204, 113, 0.4); background: rgba(46, 204, 113, 0.05);">
+            <div class="card-header-flex">
+              <span class="card-title" style="color: #2ECC71;">💡 نصيحة المدرب للتمرين الحالي</span>
+            </div>
+            <p id="coach-live-tip" style="font-size: 0.84rem; color: #E0E0E0; line-height: 1.5; margin-top: 6px;">
+              حافظ على شد عضلات البطن والتنفس المنتظم أثناء النزول والصعود.
+            </p>
+          </div>
+        </div>
+
+        <!-- TAB 3: الماسح البدني بوضعية دبل بايسبس وتوليد الجداول (AI Body Scan) -->
+        <div id="tab-bodyscan" class="sidebar-panel">
+          <div class="panel-section-title">
+            <span>🦾</span>
+            <span>الماسح البدني الذكي (Front Double Biceps)</span>
+          </div>
+
+          <div class="dash-card">
+            <p class="card-desc" style="margin-bottom: 12px;">
+              التقط صورة أمام الكاميرا أو ارفع صورة بوضعية <strong>دبل بايسبس أمامي (Front Double Biceps)</strong> ليقوم الذكاء الاصطناعي بتحليل زوايا البايسبس وتماثل الذراعين ونسبة الأكتاف وتوليد جدول تدريبي مخصص لأيام تمرينك!
+            </p>
+
+            <!-- Image Upload / Camera Trigger Area -->
+            <div class="biceps-scanner-box">
+              <div id="biceps-preview-container" class="biceps-preview-container">
+                <img id="biceps-image-preview" class="biceps-image-preview" style="display: none;" alt="معاينة فحص الجسم">
+                <canvas id="biceps-scan-canvas" class="biceps-scan-canvas" style="display: none;"></canvas>
+                <div id="biceps-placeholder" class="biceps-placeholder">
+                  <div style="font-size: 2.8rem; margin-bottom: 6px;">💪</div>
+                  <div style="font-weight: 800; font-size: 0.95rem; color: var(--gold-bright);">وضعية دبل بايسبس أمامي</div>
+                  <div style="font-size: 0.76rem; color: var(--text-muted); margin-top: 4px;">ارفع ذراعيك كوضعية كمال الأجسام الشهيرة أمام الكاميرا</div>
+                </div>
+                <div id="biceps-scan-laser" class="scan-laser-line" style="display: none;"></div>
+              </div>
+
+              <!-- Action buttons -->
+              <div class="scanner-buttons-row">
+                <input type="file" id="input-biceps-photo" accept="image/*" style="display: none;">
+                <button id="btn-upload-biceps-photo" class="btn-sidebar-secondary">
+                  <span>📁 رفع صورة من المعرض</span>
+                </button>
+                <button id="btn-capture-biceps-live" class="btn-sidebar-action">
+                  <span>📸 فحص الكاميرا المباشرة</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Analysis Results (Hidden until scanned) -->
+            <div id="biceps-analysis-results" class="biceps-results-card" style="display: none; margin-top: 14px;">
+              <h4 style="color: var(--gold-bright); font-size: 0.92rem; margin-bottom: 10px; display: flex; align-items: center; gap: 6px;">
+                <span>📊</span> <span>تقرير التحليل البدني الذكي:</span>
+              </h4>
+
+              <div class="metrics-row-scanner">
+                <div class="scanner-stat">
+                  <span class="stat-lbl">زاوية انقباض البايسبس:</span>
+                  <span id="scan-val-flexion" class="stat-val">76° (ممتاز)</span>
+                </div>
+                <div class="scanner-stat">
+                  <span class="stat-lbl">تماثل الذراعين (Symmetry):</span>
+                  <span id="scan-val-symmetry" class="stat-val">96%</span>
+                </div>
+                <div class="scanner-stat">
+                  <span class="stat-lbl">تناسق V-Taper (الكتف/الخصر):</span>
+                  <span id="scan-val-vtaper" class="stat-val">1.42 (رياضي)</span>
+                </div>
+                <div class="scanner-stat">
+                  <span class="stat-lbl">تقييم اللياقة العام:</span>
+                  <span id="scan-val-status" class="stat-val" style="color: #2ECC71;">بنية رياضية واعدة</span>
+                </div>
+              </div>
+
+              <!-- Workout Generator Form -->
+              <div style="margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--gold-border);">
+                <label style="display: block; font-size: 0.82rem; color: var(--gold-bright); margin-bottom: 6px;">
+                  1. حدد عدد أيام التدريب الأسبوعية:
+                </label>
+                <div class="days-selector-grid">
+                  <button class="day-opt-btn" data-days="3">3 أيام</button>
+                  <button class="day-opt-btn active" data-days="4">4 أيام</button>
+                  <button class="day-opt-btn" data-days="5">5 أيام</button>
+                  <button class="day-opt-btn" data-days="6">6 أيام</button>
+                </div>
+
+                <label style="display: block; font-size: 0.82rem; color: var(--gold-bright); margin: 12px 0 6px;">
+                  2. الهدف الرياضي الأساسي:
+                </label>
+                <select id="select-training-goal" class="sidebar-select">
+                  <option value="hypertrophy">💪 تضخيم وبناء الكتلة العضلية</option>
+                  <option value="fatburn">🔥 تنشيف وحرق الدهون مع الحفاظ على العضل</option>
+                  <option value="strength">⚡ قوة بدنية ولياقة شاملة</option>
+                </select>
+
+                <button id="btn-generate-ai-routine" class="btn-primary-workout" style="width: 100%; margin-top: 14px; padding: 12px;">
+                  <span>✨ توليد وتفعيل الجدول الرياضي المخصص بالذكاء الاصطناعي</span>
+                </button>
+              </div>
+
+              <!-- Generated Routine Preview -->
+              <div id="generated-routine-preview" style="display: none; margin-top: 14px; background: rgba(0,0,0,0.4); border: 1px solid var(--gold-primary); border-radius: 12px; padding: 12px;">
+                <div style="font-weight: 800; color: var(--gold-bright); font-size: 0.95rem; margin-bottom: 4px;" id="gen-routine-title">
+                  جدول AI Gym المخصص (4 أيام)
+                </div>
+                <p id="gen-routine-desc" style="font-size: 0.8rem; color: #CCC; margin-bottom: 8px;">
+                  تمت موازنة التمارين لتطوير البايسبس وتوسيع الأكتاف وتناسق الجذع.
+                </p>
+                <div id="gen-routine-days-summary" style="font-size: 0.78rem; color: var(--text-muted); line-height: 1.6;"></div>
+                <button id="btn-start-ai-routine-now" class="btn-sidebar-action" style="margin-top: 10px;">
+                  <span>🚀 بدء تمرين اليوم الأول من هذا الجدول فوراً</span>
+                </button>
+              </div>
+
+            </div>
+
+          </div>
+        </div>
+
+        <!-- TAB 4: الإعدادات العامة (Settings) -->
+        <div id="tab-settings" class="sidebar-panel">
+          <div class="panel-section-title">
+            <span>⚙️</span>
+            <span>إعدادات التطبيق والتخصيص</span>
+          </div>
+
+          <!-- Language Setting -->
+          <div class="dash-card">
+            <div class="setting-item-flex">
+              <div>
+                <div class="setting-label">🌐 لغة التطبيق (Language)</div>
+                <div class="setting-hint">العربية أو English</div>
+              </div>
+              <button id="btn-toggle-lang" class="btn-setting-pill">AR (العربية)</button>
+            </div>
+          </div>
+
+          <!-- Audio & SFX -->
+          <div class="dash-card">
+            <div class="setting-item-flex">
+              <div>
+                <div class="setting-label">🔊 كتم / تشغيل الصوت</div>
+                <div class="setting-hint">الأصوات التحفيزية ونغمات الأجراس</div>
+              </div>
+              <button id="btn-toggle-mute" class="btn-setting-pill">🔊 مفعل</button>
+            </div>
+          </div>
+
+          <!-- Camera Controls -->
+          <div class="dash-card">
+            <div class="setting-item-flex">
+              <div>
+                <div class="setting-label">📷 تبديل الكاميرا</div>
+                <div class="setting-hint">التبديل بين الكاميرا الأمامية والخلفية</div>
+              </div>
+              <button id="btn-toggle-camera" class="btn-setting-pill">🔄 تبديل</button>
+            </div>
+          </div>
+
+          <!-- Ghost Rival Mode -->
+          <div class="dash-card">
+            <div class="setting-item-flex">
+              <div>
+                <div class="setting-label">👻 وضع الشبح التنافسي (Ghost Rival)</div>
+                <div class="setting-hint">سابق وتفوق على الشبح الذكي</div>
+              </div>
+              <button id="btn-toggle-ghost" class="btn-setting-pill">👻 تفعيل</button>
+            </div>
+          </div>
+
+          <!-- Exercise Guide -->
+          <div class="dash-card">
+            <div class="setting-item-flex">
+              <div>
+                <div class="setting-label">ℹ️ دليل طريقة أداء التمارين</div>
+                <div class="setting-hint">شرح الزوايا، الخطوات، وتجنب الأخطاء</div>
+              </div>
+              <button id="btn-exercise-guide" class="btn-setting-pill">📖 فتح الدليل</button>
+            </div>
+          </div>
+
+          <!-- Cloud Sync -->
+          <div class="dash-card">
+            <div class="setting-item-flex">
+              <div>
+                <div class="setting-label">☁️ المزامنة السحابية (Google Firebase)</div>
+                <div class="setting-hint">مزامنة إحصائياتك والنسخ الاحتياطي</div>
+              </div>
+              <button id="btn-open-cloud" class="btn-setting-pill">☁️ مزامنة</button>
+            </div>
+          </div>
+
+          <!-- Rest Timer Duration -->
+          <div class="dash-card">
+            <div class="setting-item-flex">
+              <div>
+                <div class="setting-label">⏳ مدة مؤقت الراحة الافتراضية</div>
+                <div class="setting-hint">الوقت الفاصل بين الجولات التدريبية</div>
+              </div>
+              <select id="setting-rest-duration" class="sidebar-select" style="width: auto;">
+                <option value="30">30 ثانية</option>
+                <option value="45">45 ثانية</option>
+                <option value="60" selected>60 ثانية</option>
+                <option value="90">90 ثانية</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- TAB 5: لوحة المطور (Developer Panel) -->
+        <div id="tab-dev" class="sidebar-panel">
+          <div class="panel-section-title">
+            <span>🛠️</span>
+            <span>لوحة المطور (Eng. Ibrahim Al-Banna)</span>
+          </div>
+
+          <!-- Dev Signature Card -->
+          <div class="dash-card" style="border: 1px solid var(--gold-bright); background: radial-gradient(circle, rgba(212,175,55,0.12) 0%, rgba(10,10,12,0.8) 100%);">
+            <div style="display: flex; align-items: center; gap: 10px;">
+              <img src="icons/logo.jpg" style="width: 44px; height: 44px; border-radius: 10px; border: 1px solid var(--gold-bright);" alt="Logo">
+              <div>
+                <div style="font-weight: 900; color: var(--gold-bright); font-size: 1rem;">AI gym Engine v3.0</div>
+                <div style="font-size: 0.78rem; color: #FFF;">Lead Engineer: Eng. Ibrahim Al-Banna</div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Sensor Inspector -->
+          <div class="dash-card">
+            <span class="card-title">📡 مراقب الحساسات المباشر (Sensor Inspector):</span>
+            <div class="dev-telemetry-grid">
+              <div class="dev-telemetry-item">
+                <span class="lbl">معدل الإطارات (FPS):</span>
+                <span id="dev-fps" class="val">--</span>
+              </div>
+              <div class="dev-telemetry-item">
+                <span class="lbl">ثقة الرؤية (Confidence):</span>
+                <span id="dev-pose-confidence" class="val">98%</span>
+              </div>
+              <div class="dev-telemetry-item">
+                <span class="lbl">النقاط العظمية (Keypoints):</span>
+                <span id="dev-keypoints-count" class="val">33 نقاط</span>
+              </div>
+              <div class="dev-telemetry-item">
+                <span class="lbl">زمن المعالجة (Latency):</span>
+                <span id="dev-latency" class="val">18ms</span>
+              </div>
+            </div>
+          </div>
+
+          <!-- Rep Simulator -->
+          <div class="dash-card">
+            <span class="card-title">🧪 محاكي التكرارات (Rep Simulator):</span>
+            <p class="card-desc">محاكاة إنجاز التكرارات برمجياً للتأكد من المحرك الصوتي وحساب السعرات دون الحاجة للوقوف أمام الكاميرا.</p>
+            <div style="display: flex; gap: 8px; margin-top: 10px;">
+              <button id="btn-dev-sim-rep" class="btn-sidebar-secondary" style="flex: 1;">➕ 1 عدة</button>
+              <button id="btn-dev-sim-super" class="btn-sidebar-secondary" style="flex: 1; border-color: #2ECC71; color: #2ECC71;">🔥 عدة خارقة</button>
+              <button id="btn-dev-sim-reset" class="btn-sidebar-secondary" style="flex: 1; border-color: #E74C3C; color: #E74C3C;">🔄 تصفير</button>
+            </div>
+          </div>
+
+          <!-- Google Firebase Developer Settings -->
+          <div class="dash-card">
+            <span class="card-title">☁️ إعدادات Google Firebase السحابية:</span>
+            <p class="card-desc">أدخل مفاتيح مشروع Firebase الخاص بك للربط السحابي مع Google Cloud Firestore:</p>
+            <div style="display: flex; flex-direction: column; gap: 8px; margin-top: 8px;">
+              <div>
+                <label style="font-size: 0.74rem; color: var(--gold-bright);">Firebase API Key:</label>
+                <input id="dev-fb-apikey" type="text" placeholder="AIzaSy..." class="sidebar-input">
+              </div>
+              <div>
+                <label style="font-size: 0.74rem; color: var(--gold-bright);">Project ID:</label>
+                <input id="dev-fb-projectid" type="text" placeholder="aigym-project..." class="sidebar-input">
+              </div>
+              <div>
+                <label style="font-size: 0.74rem; color: var(--gold-bright);">App ID:</label>
+                <input id="dev-fb-appid" type="text" placeholder="1:123456:web..." class="sidebar-input">
+              </div>
+              <button id="btn-dev-save-firebase" class="btn-sidebar-action" style="margin-top: 4px;">
+                <span>💾 حفظ إعدادات Firebase السحابية</span>
+              </button>
+            </div>
+          </div>
+
+          <!-- Data & Cache Reset -->
+          <div class="dash-card">
+            <span class="card-title">🗑️ إدارة الذاكرة المحلية:</span>
+            <div style="display: flex; gap: 8px; margin-top: 8px;">
+              <button id="btn-dev-clear-storage" class="btn-sidebar-secondary" style="color: #E74C3C; border-color: rgba(231,76,60,0.5); width: 100%;">
+                <span>⚠️ مسح بيانات الكاش المؤقتة</span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+    </aside>
+
+    <!-- Welcome / Onboarding Screen -->
+    <div id="welcome-modal" class="welcome-modal">
+      <div class="welcome-logo-box">
+        <img src="icons/logo.jpg" alt="AI gym Logo" class="welcome-logo-img">
+      </div>
+      <h1 class="welcome-title">AI gym</h1>
+      <p class="welcome-subtitle">تطبيق اللياقة البدنية والتمارين الذكي بالرؤية الحاسوبية - إشراف وتطوير م. إبراهيم البنا</p>
+
+      <div class="features-list">
+        <div class="feature-item">
+          <span class="feature-dot"></span>
+          <span>عدّ آلي دقيق لزوايا المفاصل والتكرارات بالذكاء الاصطناعي.</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-dot"></span>
+          <span>مدرب صوتي تفاعلي مع خيارات شخصية متعددة (حماسي، متزن، ودقيق).</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-dot"></span>
+          <span>تحكم صوتي بالأوامر (عربي / English) لبدء وإيقاف التمرين دون لمس الشاشة.</span>
+        </div>
+        <div class="feature-item">
+          <span class="feature-dot"></span>
+          <span>فحص بدني ذكي بوضعية دبل بايسبس وتوليد جداول تدريبية مخصصة.</span>
+        </div>
+      </div>
+
+      <button id="btn-welcome-start" class="btn-primary-workout" style="width: 100%; max-width: 320px;">
+        <span>انطلق وابدأ التمرين الآن</span>
+        <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
+      </button>
+    </div>
+
+    <!-- Summary Dialog after workout -->
+    <div id="summary-dialog" class="summary-dialog">
+      <div class="summary-card">
+        <div style="font-size: 2.8rem; margin-bottom: 8px;">🏆</div>
+        <h2 style="font-weight: 900; color: var(--gold-bright); margin-bottom: 4px;">عاش يا بطل!</h2>
+        <p style="color: var(--text-muted); font-size: 0.88rem;">ملخص إنجازك في الجولة التدريبية</p>
+
+        <div class="summary-grid">
+          <div class="summary-box">
+            <div id="sum-reps" class="summary-val">0</div>
+            <div class="summary-lbl">إجمالي العدات</div>
+          </div>
+          <div class="summary-box">
+            <div id="sum-time" class="summary-val">00:00</div>
+            <div class="summary-lbl">وقت التمرين</div>
+          </div>
+          <div class="summary-box">
+            <div id="sum-cals" class="summary-val">0</div>
+            <div class="summary-lbl">سعرة حرارية</div>
+          </div>
+          <div class="summary-box">
+            <div id="sum-form" class="summary-val">100%</div>
+            <div class="summary-lbl">دقة الأداء</div>
+          </div>
+        </div>
+
+        <button id="btn-close-summary" class="btn-primary-workout" style="width: 100%;">
+          <span>إغلاق والعودة</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Camera Permission & HTTPS Helper Modal for iOS -->
+    <div id="camera-permission-modal" class="permission-modal">
+      <div class="permission-card">
+        <div class="permission-title">
+          <span>📷</span>
+          <span>تفعيل الكاميرا على الآيفون</span>
+        </div>
+        <p class="permission-desc">
+          يشترط متصفح Safari على هواتف iPhone فتح الموقع عبر رابط مشفر (HTTPS) للسماح بتشغيل الكاميرا في الشبكة المحلية.
+        </p>
+
+        <div class="steps-box">
+          <div class="step-row">
+            <span class="step-num">1</span>
+            <span>اضغط الزر أدناه للانتقال للرابط الآمن المشفّر (منفذ 8443).</span>
+          </div>
+          <div class="step-row">
+            <span class="step-num">2</span>
+            <span>في سفاري، اضغط <strong>"إظهار التفاصيل" (Show Details)</strong> ثم اضغط <strong>"زيارة هذا الموقع" (Visit this website)</strong>.</span>
+          </div>
+          <div class="step-row">
+            <span class="step-num">3</span>
+            <span>اضغط <strong>"سماح" (Allow)</strong> عند طلب إذن الكاميرا.</span>
+          </div>
+        </div>
+
+        <a id="btn-open-https" href="https://192.168.18.189:8443/index.html" class="btn-https-link">
+          🔒 فتح الرابط المشفّر (HTTPS)
+        </a>
+        <button id="btn-dismiss-permission" class="btn-modal-dismiss">
+          إغلاق ومحاولة أخرى
+        </button>
+      </div>
+    </div>
+
+    <!-- Exercise Guide & How-to-Perform Modal -->
+    <div id="exercise-guide-modal" class="permission-modal">
+      <div class="permission-card" style="max-height: 85vh; overflow-y: auto;">
+        <div class="permission-title">
+          <span id="guide-modal-icon">ℹ️</span>
+          <span id="guide-modal-title">طريقة الأداء الصحيح</span>
+        </div>
+
+        <div style="background: rgba(46, 204, 113, 0.12); border: 1px solid rgba(46, 204, 113, 0.4); border-radius: 12px; padding: 10px; margin-bottom: 14px; font-size: 0.82rem; color: #2ECC71;">
+          🟢 <strong>ملاحظة هامة:</strong> ستظهر خطوط وأسهم خضراء متحركة فوق جسمك على الشاشة توضح لك اتجاه ومسار الحركة الصحيح أثناء التمرين!
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <h4 style="color: var(--gold-bright); font-size: 0.95rem; margin-bottom: 6px;">📋 خطوات التمرين:</h4>
+          <ul id="guide-steps-list" style="padding-right: 20px; font-size: 0.85rem; color: #DDD; line-height: 1.6;">
+            <!-- Dynamic steps -->
+          </ul>
+        </div>
+
+        <div style="margin-bottom: 14px;">
+          <h4 style="color: #FF6B6B; font-size: 0.95rem; margin-bottom: 6px;">⚠️ أخطاء شائعة تجنبها:</h4>
+          <ul id="guide-mistakes-list" style="padding-right: 20px; font-size: 0.85rem; color: #FF9E9E; line-height: 1.6;">
+            <!-- Dynamic mistakes -->
+          </ul>
+        </div>
+
+        <div style="margin-bottom: 16px; font-size: 0.85rem; color: var(--gold-bright);">
+          🎯 <strong>الزاوية المستهدفة:</strong> <span id="guide-target-angle">90 درجة للركبة</span>
+        </div>
+
+        <button id="btn-close-guide" class="btn-primary-workout" style="width: 100%; padding: 12px; font-size: 1rem;">
+          <span>فهمت الطريقة! لنبدأ الآن 🚀</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- In-App Custom Exercise Creator & Calibration Modal -->
+    <div id="custom-exercise-modal" class="permission-modal">
+      <div class="permission-card" style="max-height: 88vh; overflow-y: auto;">
+        <div class="permission-title">
+          <span>🛠️</span>
+          <span>صانع التمارين الخاصة</span>
+        </div>
+        <p class="permission-desc" style="font-size: 0.82rem; margin-bottom: 12px;">
+          ابتكر تمرينك الخاص وحدد زوايا حركتك أمام الكاميرا، وسيتم حفظه في هاتفك بشكل دائم!
+        </p>
+
+        <!-- Exercise Name -->
+        <div style="margin-bottom: 12px;">
+          <label style="display: block; font-size: 0.8rem; color: var(--gold-bright); margin-bottom: 4px;">1. اسم التمرين:</label>
+          <input id="custom-input-name" type="text" placeholder="مثال: عقلة خاصة، رفرفة دمبلز..." style="width: 100%; padding: 9px 12px; background: rgba(0,0,0,0.5); border: 1px solid var(--gold-border); border-radius: 10px; color: #FFF; font-family: 'Cairo'; font-size: 0.9rem; outline: none;">
+        </div>
+
+        <!-- Target Joint -->
+        <div style="margin-bottom: 14px;">
+          <label style="display: block; font-size: 0.8rem; color: var(--gold-bright); margin-bottom: 4px;">2. المفصل المستهدف:</label>
+          <select id="custom-select-joint" style="width: 100%; padding: 9px 12px; background: #121216; border: 1px solid var(--gold-border); border-radius: 10px; color: #FFF; font-family: 'Cairo'; font-size: 0.88rem;">
+            <option value="knee">🦵 الركبة والفخذ (مثل السكوات والطعنات)</option>
+            <option value="elbow">💪 الكوع والذراع (مثل البايسبس والضغط والعقلة)</option>
+            <option value="shoulder">🏋️ الكتف والجذع (مثل الرفرفة وضغط الأكتاف)</option>
+            <option value="hip">🍫 الحوض والبطن (مثل المعدة والرفعة الميتة)</option>
+          </select>
+        </div>
+
+        <!-- Live Calibration Box -->
+        <div style="background: rgba(212, 175, 55, 0.08); border: 1px solid var(--gold-border); border-radius: 14px; padding: 12px; margin-bottom: 14px; text-align: center;">
+          <div style="font-size: 0.76rem; color: var(--text-muted); margin-bottom: 2px;">الزاوية الحالية للمفصل أمام الكاميرا:</div>
+          <div id="custom-live-angle-display" style="font-family: 'Outfit', sans-serif; font-size: 2.2rem; font-weight: 900; color: var(--gold-bright);">--°</div>
+
+          <div style="display: flex; gap: 8px; margin-top: 8px;">
+            <button id="btn-calibrate-start" type="button" style="flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; padding: 8px 4px; font-family: 'Cairo'; font-size: 0.78rem; color: #FFF; cursor: pointer;">
+              📌 وضعية البداية
+              <div id="badge-start-angle" style="color: var(--gold-bright); font-weight: 800; font-size: 0.85rem; margin-top: 2px;">160°</div>
+            </button>
+            <button id="btn-calibrate-end" type="button" style="flex: 1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.2); border-radius: 10px; padding: 8px 4px; font-family: 'Cairo'; font-size: 0.78rem; color: #FFF; cursor: pointer;">
+              🎯 أقصى نزول / انثناء
+              <div id="badge-end-angle" style="color: #2ECC71; font-weight: 800; font-size: 0.85rem; margin-top: 2px;">80°</div>
+            </button>
+          </div>
+        </div>
+
+        <button id="btn-save-custom-exercise" class="btn-primary-workout" style="width: 100%; padding: 12px; font-size: 0.98rem; margin-bottom: 8px;">
+          <span>💾 حفظ التمرين في هاتفي بشكل دائم</span>
+        </button>
+        <button id="btn-cancel-custom-exercise" class="btn-modal-dismiss">
+          إلغاء
+        </button>
+      </div>
+    </div>
+
+    <!-- Rest Timer Overlay Modal (مؤقت فترات الراحة) -->
+    <div id="rest-timer-modal" class="rest-timer-modal" style="display: none;">
+      <div class="rest-timer-backdrop"></div>
+      <div class="rest-card">
+        <div class="rest-title-zone">
+          <span class="rest-icon">⏳</span>
+          <h2 class="rest-heading">فترة راحة واسترجاع</h2>
+          <p id="rest-next-exercise-label" class="rest-subheading">التمرين التالي: سكوات (الجولة 2 من 3)</p>
+        </div>
+
+        <div class="rest-ring-zone">
+          <svg class="rest-ring-svg" viewBox="0 0 200 200">
+            <circle class="rest-ring-bg" cx="100" cy="100" r="85"></circle>
+            <circle id="rest-ring-progress" class="rest-ring-progress" cx="100" cy="100" r="85"></circle>
+          </svg>
+          <div class="rest-countdown-core">
+            <div id="rest-seconds-display" class="rest-seconds-number">60</div>
+            <div class="rest-seconds-lbl">ثانية</div>
+          </div>
+        </div>
+
+        <div class="rest-actions-zone">
+          <button id="btn-rest-add15" class="btn-rest-secondary" title="إضافة 15 ثانية للراحة">
+            ➕ 15 ثانية
+          </button>
+          <button id="btn-rest-skip" class="btn-rest-primary">
+            <span>تخطي والبدء فوراً 🚀</span>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Multi-Day Routine & Planner Modal (الجداول التلقائية والروتينات) -->
+    <div id="routine-planner-modal" class="permission-modal" style="display: none;">
+      <div class="permission-card" style="max-height: 90vh; overflow-y: auto; max-width: 520px;">
+        <div class="permission-title" style="justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span>📅</span>
+            <span>جدول التمارين والروتين الذكي</span>
+          </div>
+          <button id="btn-close-routine-modal" class="icon-btn" style="width: 32px; height: 32px; font-size: 1rem;">✕</button>
+        </div>
+
+        <p class="permission-desc" style="margin-bottom: 12px; font-size: 0.82rem;">
+          اختر روتينك التدريبي أو نفّذ تمارين اليوم المحددة، مع روابط فيديو شرح يوتيوب لكل حركة!
+        </p>
+
+        <!-- Routine Selector Dropdown -->
+        <div style="margin-bottom: 14px;">
+          <label style="display: block; font-size: 0.8rem; color: var(--gold-bright); margin-bottom: 4px;">اختر الخطة التدريبية:</label>
+          <select id="routine-plan-selector" style="width: 100%; padding: 10px 12px; background: #121216; border: 1px solid var(--gold-border); border-radius: 10px; color: #FFF; font-family: 'Cairo'; font-size: 0.88rem;">
+            <!-- Options populated dynamically -->
+          </select>
+        </div>
+
+        <!-- Days Tabs -->
+        <div id="routine-days-container" class="routine-days-bar" style="display: flex; gap: 6px; overflow-x: auto; padding-bottom: 8px; margin-bottom: 12px;">
+          <!-- Day tabs e.g. اليوم 1، اليوم 2 -->
+        </div>
+
+        <!-- Selected Day Plan Info -->
+        <div id="routine-day-card" style="background: rgba(255,255,255,0.03); border: 1px solid var(--gold-border); border-radius: 14px; padding: 14px; margin-bottom: 14px;">
+          <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px;">
+            <h3 id="routine-day-name" style="color: var(--gold-bright); font-size: 1rem; margin: 0;">اليوم الأول: الأرجل والسكوات</h3>
+            <span id="routine-exercises-count" style="font-size: 0.78rem; color: var(--text-muted);">3 تمارين</span>
+          </div>
+
+          <!-- Exercises List inside Day -->
+          <div id="routine-exercises-list" style="display: flex; flex-direction: column; gap: 10px;">
+            <!-- Rendered list with YouTube button -->
+          </div>
+        </div>
+
+        <!-- Start Workout Session with this Routine -->
+        <button id="btn-start-routine-session" class="btn-primary-workout" style="width: 100%; padding: 12px; font-size: 1rem; margin-bottom: 8px;">
+          <span>🚀 بدء جلسة تمارين هذا اليوم تلقائياً</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- YouTube Demonstration Video Modal (مشاهدة شرح التمرين يوتيوب) -->
+    <div id="youtube-player-modal" class="permission-modal" style="display: none;">
+      <div class="permission-card" style="max-width: 540px; padding: 16px;">
+        <div class="permission-title" style="justify-content: space-between; margin-bottom: 12px;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="color: #FF0000; font-size: 1.2rem;">▶️</span>
+            <span id="youtube-modal-exercise-title">شرح أداء التمرين (YouTube)</span>
+          </div>
+          <button id="btn-close-youtube-modal" class="icon-btn" style="width: 32px; height: 32px; font-size: 1rem;">✕</button>
+        </div>
+
+        <div class="youtube-iframe-wrapper" style="position: relative; padding-bottom: 56.25%; height: 0; overflow: hidden; border-radius: 12px; border: 1px solid var(--gold-border); background: #000;">
+          <iframe id="youtube-iframe" style="position: absolute; top:0; left: 0; width: 100%; height: 100%; border: 0;" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowfullscreen></iframe>
+        </div>
+
+        <p style="font-size: 0.78rem; color: var(--text-muted); margin-top: 10px; text-align: center;">
+          شاهد الأسلوب الاحترافي للتحكم في النزول والصعود وتجنب الإصابات.
+        </p>
+
+        <button id="btn-done-youtube" class="btn-primary-workout" style="width: 100%; margin-top: 10px; padding: 10px;">
+          <span>تمت المشاهدة! العودة للتطبيق</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Firebase Cloud Sync Modal (المزامنة السحابية وقواعد بيانات جوجل) -->
+    <div id="cloud-sync-modal" class="permission-modal" style="display: none;">
+      <div class="permission-card" style="max-width: 440px;">
+        <div class="permission-title" style="justify-content: space-between;">
+          <div style="display: flex; align-items: center; gap: 8px;">
+            <span style="font-size: 1.3rem;">☁️</span>
+            <span>المزامنة السحابية (Google Firebase)</span>
+          </div>
+          <button id="btn-close-cloud-modal" class="icon-btn" style="width: 32px; height: 32px; font-size: 1rem;">✕</button>
+        </div>
+
+        <p class="permission-desc" style="font-size: 0.82rem; margin-bottom: 14px;">
+          احفظ جداولك التدريبية وإحصائيات عداتك على سحابة Google Firestore مجاناً لمزامنتها بين هاتفك وحاسوبك.
+        </p>
+
+        <div style="background: rgba(255, 255, 255, 0.04); border: 1px solid var(--gold-border); border-radius: 12px; padding: 12px; margin-bottom: 14px; font-size: 0.85rem;">
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span style="color: var(--text-muted);">حالة السحابة:</span>
+            <span id="cloud-status-badge" style="color: #2ECC71; font-weight: 700;">🟢 محلي ومزامن</span>
+          </div>
+          <div style="display: flex; justify-content: space-between; margin-bottom: 6px;">
+            <span style="color: var(--text-muted);">معرّف المتدرب:</span>
+            <span id="cloud-user-id" style="font-family: 'Outfit'; color: var(--gold-bright); font-size: 0.8rem;">trainee_local</span>
+          </div>
+          <div style="display: flex; justify-content: space-between;">
+            <span style="color: var(--text-muted);">الجلسات المحفوظة:</span>
+            <span id="cloud-synced-count" style="color: #FFF; font-weight: 700;">0 جلسة</span>
+          </div>
+        </div>
+
+        <button id="btn-sync-now" class="btn-primary-workout" style="width: 100%; padding: 12px; margin-bottom: 8px;">
+          <span>🔄 مزامنة البيانات الآن (Sync to Cloud)</span>
+        </button>
+        <button id="btn-export-backup" class="btn-modal-dismiss" style="width: 100%;">
+          📁 تصدير نسخة احتياطية (JSON)
+        </button>
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Scripts -->
+  <!-- Google Firebase SDKs (Compat v9 for direct web script execution) -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+
+  <!-- Application Modules -->
+  <script src="firebase-service.js?v=3.0"></script>
+  <script src="routine-manager.js?v=3.0"></script>
+  <script src="audio-coach.js?v=3.0"></script>
+  <script src="pose-engine.js?v=3.0"></script>
+  <script src="app.js?v=3.0"></script>
+</body>
+</html>
