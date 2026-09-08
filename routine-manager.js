@@ -183,6 +183,37 @@ class RoutineManager {
     return this.activeRoutine || this.routines[0];
   }
 
+  addRoutine(routine) {
+    if (!routine) return null;
+    routine.name = routine.name || routine.title || 'روتين مخصص بالذكاء الاصطناعي';
+    routine.title = routine.name;
+    if (routine.days) {
+      routine.days.forEach(d => {
+        d.exercises = d.exercises || d.items || [];
+        d.items = d.exercises;
+        d.exercises.forEach(ex => {
+          ex.exerciseKey = ex.exerciseKey || ex.exerciseId || 'squats';
+          ex.exerciseId = ex.exerciseKey;
+          ex.sets = ex.sets || ex.targetSets || 3;
+          ex.targetSets = ex.sets;
+          ex.targetReps = ex.targetReps || 10;
+          ex.restSeconds = ex.restSeconds || 45;
+        });
+      });
+    }
+
+    const existingIdx = this.routines.findIndex(r => r.id === routine.id);
+    if (existingIdx >= 0) {
+      this.routines[existingIdx] = routine;
+    } else {
+      this.routines.unshift(routine);
+    }
+
+    this.saveRoutines();
+    this.selectRoutine(routine.id);
+    return routine;
+  }
+
   selectRoutine(id) {
     this.activeRoutineId = id;
     this.activeRoutine = this.routines.find(r => r.id === id) || this.routines[0];

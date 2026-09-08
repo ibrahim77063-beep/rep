@@ -197,6 +197,22 @@
         <button id="btn-close-sidebar" class="sidebar-close-btn" title="إغلاق القائمة">✕</button>
       </div>
 
+      <!-- User Profile & Role Status Bar -->
+      <div id="sidebar-user-card" class="sidebar-user-card">
+        <div class="user-card-info">
+          <div id="user-display-name" class="user-display-name">ضيف (Guest)</div>
+          <div id="user-role-badge" class="user-role-badge role-guest">👤 متدرب ضيف</div>
+        </div>
+        <div class="user-card-actions">
+          <button id="btn-sidebar-auth-action" class="btn-user-action" title="تسجيل الدخول / تبديل الحساب">
+            <span>🔑</span>
+          </button>
+          <button id="btn-sidebar-signout" class="btn-user-action" title="تسجيل الخروج" style="display: none;">
+            <span>🚪</span>
+          </button>
+        </div>
+      </div>
+
       <!-- Navigation Tabs -->
       <nav class="sidebar-nav-tabs">
         <button class="sidebar-tab-btn active" data-tab="dashboard">
@@ -215,9 +231,10 @@
           <span class="tab-icon">⚙️</span>
           <span class="tab-label">الإعدادات</span>
         </button>
-        <button class="sidebar-tab-btn" data-tab="dev">
+        <!-- Developer Tab (Admin Only - Hidden from regular users) -->
+        <button id="tab-btn-dev" class="sidebar-tab-btn" data-tab="dev" style="display: none;">
           <span class="tab-icon">🛠️</span>
-          <span class="tab-label">المطور</span>
+          <span class="tab-label">المطور (Admin)</span>
         </button>
       </nav>
 
@@ -655,37 +672,86 @@
       </div>
     </aside>
 
-    <!-- Welcome / Onboarding Screen -->
+    <!-- Ultra-Luxurious Welcome & Auth Screen -->
     <div id="welcome-modal" class="welcome-modal">
-      <div class="welcome-logo-box">
-        <img src="icons/logo.jpg" alt="AI gym Logo" class="welcome-logo-img">
-      </div>
-      <h1 class="welcome-title">AI gym</h1>
-      <p class="welcome-subtitle">تطبيق اللياقة البدنية والتمارين الذكي بالرؤية الحاسوبية - إشراف وتطوير م. إبراهيم البنا</p>
+      <div class="welcome-auth-card">
+        
+        <!-- Logo Emblem (WITHOUT NAME - Glowing 3D Emblem with Halo) -->
+        <div class="welcome-emblem-zone">
+          <div class="emblem-halo-pulse"></div>
+          <img src="icons/logo.jpg" alt="Logo" class="welcome-emblem-img">
+        </div>
 
-      <div class="features-list">
-        <div class="feature-item">
-          <span class="feature-dot"></span>
-          <span>عدّ آلي دقيق لزوايا المفاصل والتكرارات بالذكاء الاصطناعي.</span>
-        </div>
-        <div class="feature-item">
-          <span class="feature-dot"></span>
-          <span>مدرب صوتي تفاعلي مع خيارات شخصية متعددة (حماسي، متزن، ودقيق).</span>
-        </div>
-        <div class="feature-item">
-          <span class="feature-dot"></span>
-          <span>تحكم صوتي بالأوامر (عربي / English) لبدء وإيقاف التمرين دون لمس الشاشة.</span>
-        </div>
-        <div class="feature-item">
-          <span class="feature-dot"></span>
-          <span>فحص بدني ذكي بوضعية دبل بايسبس وتوليد جداول تدريبية مخصصة.</span>
-        </div>
-      </div>
+        <!-- Auth Feedback Alert Box -->
+        <div id="auth-alert-box" class="auth-alert-box" style="display: none;"></div>
 
-      <button id="btn-welcome-start" class="btn-primary-workout" style="width: 100%; max-width: 320px;">
-        <span>انطلق وابدأ التمرين الآن</span>
-        <svg width="20" height="20" fill="currentColor" viewBox="0 0 24 24"><path d="M12 4l-1.41 1.41L16.17 11H4v2h12.17l-5.58 5.59L12 20l8-8z"/></svg>
-      </button>
+        <!-- Google Quick Sign In Button -->
+        <button id="btn-auth-google" class="btn-auth-google">
+          <svg class="google-svg-icon" viewBox="0 0 24 24">
+            <path fill="#EA4335" d="M12 5c1.6 0 3 .6 4.1 1.6l3.1-3.1C17.3 1.7 14.8 1 12 1 7.4 1 3.5 3.6 1.6 7.4l3.7 2.9C6.2 7.4 8.8 5 12 5z"/>
+            <path fill="#4285F4" d="M23.5 12.3c0-.8-.1-1.7-.2-2.3H12v4.6h6.5c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.7-5 3.7-8.9z"/>
+            <path fill="#FBBC05" d="M5.3 14.7c-.2-.7-.4-1.5-.4-2.7s.1-2 .4-2.7L1.6 6.4C.6 8.3 0 10.1 0 12s.6 3.7 1.6 5.6l3.7-2.9z"/>
+            <path fill="#34A853" d="M12 23c3.2 0 6-1.1 8-3l-3.7-2.9c-1.1.7-2.5 1.2-4.3 1.2-3.2 0-5.8-2.4-6.7-5.3L1.6 15.9C3.5 19.7 7.4 23 12 23z"/>
+          </svg>
+          <span>المتابعة السريعة بحساب Google</span>
+        </button>
+
+        <div class="auth-divider">
+          <span>أو عبر البريد الإلكتروني</span>
+        </div>
+
+        <!-- Auth Tabs (Login / Register) -->
+        <div class="auth-mode-switch">
+          <button id="btn-mode-signin" class="auth-mode-btn active">تسجيل الدخول</button>
+          <button id="btn-mode-signup" class="auth-mode-btn">حساب جديد</button>
+        </div>
+
+        <!-- Email & Password Form -->
+        <form id="auth-email-form" class="auth-email-form" onsubmit="return false;">
+          <div id="auth-name-group" class="auth-input-group" style="display: none;">
+            <label class="auth-input-label">الاسم الكامل:</label>
+            <input type="text" id="auth-input-name" class="auth-input" placeholder="اسمك أو لقبك الرياضي">
+          </div>
+          <div class="auth-input-group">
+            <label class="auth-input-label">البريد الإلكتروني:</label>
+            <input type="email" id="auth-input-email" class="auth-input" placeholder="athlete@example.com" required>
+          </div>
+          <div class="auth-input-group">
+            <label class="auth-input-label">كلمة المرور:</label>
+            <input type="password" id="auth-input-password" class="auth-input" placeholder="••••••••" required>
+          </div>
+
+          <button type="submit" id="btn-submit-auth" class="btn-primary-workout" style="width: 100%; padding: 12px; margin-top: 6px;">
+            <span id="btn-submit-auth-text">تسجيل الدخول</span>
+          </button>
+        </form>
+
+        <!-- Guest & Admin Options Row -->
+        <div class="auth-footer-options">
+          <button id="btn-auth-guest" class="btn-auth-guest-link">
+            🏃‍♂️ تخطي والدخول كضيف (بدء التمرين الآن)
+          </button>
+          <button id="btn-auth-admin-toggle" class="btn-auth-admin-link">
+            👑 دخول المشرف / الأدمن
+          </button>
+        </div>
+
+        <!-- Admin PIN Entry Popup Box (Hidden by default) -->
+        <div id="admin-pin-box" class="admin-pin-box" style="display: none;">
+          <div class="admin-pin-header">
+            <span>👑 صلاحيات مسؤول النظام (Admin)</span>
+            <button id="btn-close-admin-pin" class="icon-btn-sm">✕</button>
+          </div>
+          <p class="admin-pin-desc">أدخل رمز المرور السري للأدمن لإظهار لوحة المطور وإعدادات فايربيس:</p>
+          <div style="display: flex; gap: 8px;">
+            <input type="password" id="admin-pin-input" class="auth-input" placeholder="PIN..." style="flex: 1; text-align: center; letter-spacing: 4px;">
+            <button id="btn-submit-admin-pin" class="btn-sidebar-action" style="width: auto; padding: 0 16px;">
+              تفعيل
+            </button>
+          </div>
+        </div>
+
+      </div>
     </div>
 
     <!-- Summary Dialog after workout -->

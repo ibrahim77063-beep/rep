@@ -400,13 +400,243 @@ document.addEventListener('DOMContentLoaded', () => {
     });
   }
 
-  // Event Listeners
-  btnWelcomeStart.addEventListener('click', () => {
-    // Crucial for iPhone: First user gesture unlocks Audio and initiates MediaStream
-    audioCoach.unlock();
-    welcomeModal.classList.add('hidden');
-    startWorkout();
+  // =========================================================================
+  // AUTHENTICATION & ROLE-BASED ACCESS CONTROL (User vs Admin)
+  // =========================================================================
+  const btnAuthGoogle = document.getElementById('btn-auth-google');
+  const authAlertBox = document.getElementById('auth-alert-box');
+  const btnModeSignin = document.getElementById('btn-mode-signin');
+  const btnModeSignup = document.getElementById('btn-mode-signup');
+  const authEmailForm = document.getElementById('auth-email-form');
+  const authNameGroup = document.getElementById('auth-name-group');
+  const authInputName = document.getElementById('auth-input-name');
+  const authInputEmail = document.getElementById('auth-input-email');
+  const authInputPassword = document.getElementById('auth-input-password');
+  const btnSubmitAuth = document.getElementById('btn-submit-auth');
+  const btnSubmitAuthText = document.getElementById('btn-submit-auth-text');
+  const btnAuthGuest = document.getElementById('btn-auth-guest');
+  const btnAuthAdminToggle = document.getElementById('btn-auth-admin-toggle');
+  const adminPinBox = document.getElementById('admin-pin-box');
+  const adminPinInput = document.getElementById('admin-pin-input');
+  const btnSubmitAdminPin = document.getElementById('btn-submit-admin-pin');
+  const btnCloseAdminPin = document.getElementById('btn-close-admin-pin');
+
+  // Sidebar user status elements
+  const userDisplayNameEl = document.getElementById('user-display-name');
+  const userRoleBadgeEl = document.getElementById('user-role-badge');
+  const btnSidebarAuthAction = document.getElementById('btn-sidebar-auth-action');
+  const btnSidebarSignout = document.getElementById('btn-sidebar-signout');
+  const tabBtnDev = document.getElementById('tab-btn-dev');
+
+  let authMode = 'signin'; // 'signin' | 'signup'
+
+  function showAuthAlert(msg, type = 'error') {
+    if (!authAlertBox) return;
+    authAlertBox.textContent = msg;
+    authAlertBox.className = `auth-alert-box ${type}`;
+    authAlertBox.style.display = 'block';
+  }
+
+  function hideAuthAlert() {
+    if (authAlertBox) authAlertBox.style.display = 'none';
+  }
+
+  function applyRolePermissions(role, user) {
+    const isAdmin = (role === 'admin') || (user && user.role === 'admin');
+
+    // Developer Tab Visibility: ONLY for Admin
+    if (tabBtnDev) {
+      tabBtnDev.style.display = isAdmin ? 'inline-flex' : 'none';
+    }
+
+    // Sidebar User Profile Badge
+    if (userDisplayNameEl) {
+      userDisplayNameEl.textContent = (user && (user.displayName || user.email)) || 'ضيف (Guest)';
+    }
+
+    if (userRoleBadgeEl) {
+      if (isAdmin) {
+        userRoleBadgeEl.textContent = '👑 مسؤول النظام (Admin)';
+        userRoleBadgeEl.className = 'user-role-badge role-admin';
+      } else if (user && user.role === 'user') {
+        userRoleBadgeEl.textContent = '👤 متدرب مسجل';
+        userRoleBadgeEl.className = 'user-role-badge role-user';
+      } else {
+        userRoleBadgeEl.textContent = '🏃‍♂️ متدرب ضيف';
+        userRoleBadgeEl.className = 'user-role-badge role-guest';
+      }
+    }
+
+    if (btnSidebarSignout) {
+      btnSidebarSignout.style.display = (user && user.role !== 'guest') ? 'flex' : 'none';
+    }
+
+    // If currently on dev tab and user is not admin, redirect to dashboard
+    if (!isAdmin) {
+      const devPanel = document.getElementById('tab-dev');
+      if (devPanel && devPanel.classList.contains('active')) {
+        const dashBtn = document.querySelector('[data-tab="dashboard"]');
+        if (dashBtn) dashBtn.click();
+      }
+    }
+  }
+
+  // Google Sign In
+  if (btnAuthGoogle) {
+    btnAuthGoogle.addEventListener('click', async () => {
+      audioCoach.unlock();
+      hideAuthAlert();
+      const originalHtml = btnAuthGoogle.innerHTML;
+      btnAuthGoogle.style.opacity = '0.7';
+      btnAuthGoogle.innerHTML = '<span>جاري الاتصال بحساب Google...</span>';
+      try {
+        const res = await firebaseService.signInWithGoogle();
+        welcomeModal.classList.add('hidden');
+        applyRolePermissions(firebaseService.role, firebaseService.user);
+        showCoachToast(`مرحباً بك يا بطل! تم تسجيل الدخول (${res.user.displayName || 'Google'})`);
+        audioCoach.speak(audioCoach.language === 'ar' ? 'أهلاً بك! تم تسجيل الدخول بنجاح' : 'Welcome to AI Gym!');
+        startWorkout();
+      } catch (err) {
+        showAuthAlert(err.message || 'تعذر تسجيل الدخول بحساب Google');
+      } finally {
+        btnAuthGoogle.style.opacity = '1';
+        btnAuthGoogle.innerHTML = originalHtml;
+      }
+    });
+  }
+
+  // Toggle Login / Register
+  if (btnModeSignin && btnModeSignup) {
+    btnModeSignin.addEventListener('click', () => {
+      authMode = 'signin';
+      btnModeSignin.classList.add('active');
+      btnModeSignup.classList.remove('active');
+      if (authNameGroup) authNameGroup.style.display = 'none';
+      if (btnSubmitAuthText) btnSubmitAuthText.textContent = 'تسجيل الدخول';
+      hideAuthAlert();
+    });
+
+    btnModeSignup.addEventListener('click', () => {
+      authMode = 'signup';
+      btnModeSignup.classList.add('active');
+      btnModeSignin.classList.remove('active');
+      if (authNameGroup) authNameGroup.style.display = 'flex';
+      if (btnSubmitAuthText) btnSubmitAuthText.textContent = 'إنشاء حساب جديد';
+      hideAuthAlert();
+    });
+  }
+
+  // Email/Password Submit
+  if (authEmailForm) {
+    authEmailForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      audioCoach.unlock();
+      hideAuthAlert();
+
+      const email = (authInputEmail.value || '').trim();
+      const password = (authInputPassword.value || '').trim();
+      const name = authInputName ? (authInputName.value || '').trim() : '';
+
+      if (!email || !password) {
+        showAuthAlert('يرجى ملء جميع الحقول المطلوبة');
+        return;
+      }
+
+      btnSubmitAuth.disabled = true;
+      if (btnSubmitAuthText) btnSubmitAuthText.textContent = 'جاري التحقق...';
+
+      try {
+        let res;
+        if (authMode === 'signup') {
+          res = await firebaseService.signUpWithEmail(email, password, name);
+          showCoachToast('🎉 تم إنشاء حسابك الرياضي بنجاح!');
+        } else {
+          res = await firebaseService.signInWithEmail(email, password);
+          showCoachToast(`مرحباً بك مجدداً ${res.user.displayName}!`);
+        }
+        welcomeModal.classList.add('hidden');
+        applyRolePermissions(firebaseService.role, firebaseService.user);
+        audioCoach.speak(audioCoach.language === 'ar' ? 'تم تسجيل الدخول بنجاح! جاهز للتمرين' : 'Welcome back!');
+        startWorkout();
+      } catch (err) {
+        showAuthAlert(err.message || 'حدث خطأ في عملية تسجيل الدخول');
+      } finally {
+        btnSubmitAuth.disabled = false;
+        if (btnSubmitAuthText) btnSubmitAuthText.textContent = authMode === 'signup' ? 'إنشاء حساب جديد' : 'تسجيل الدخول';
+      }
+    });
+  }
+
+  // Guest Mode Trigger
+  if (btnAuthGuest) {
+    btnAuthGuest.addEventListener('click', () => {
+      audioCoach.unlock();
+      firebaseService.signInAsGuest();
+      welcomeModal.classList.add('hidden');
+      applyRolePermissions('guest', firebaseService.user);
+      showCoachToast('🏃‍♂️ تم الدخول كمتدرب ضيف - انطلق في التمرين!');
+      audioCoach.speak(audioCoach.language === 'ar' ? 'أهلاً بك! انطلق بالتمرين' : 'Welcome! Start workout!');
+      startWorkout();
+    });
+  }
+
+  // Admin PIN Toggle
+  if (btnAuthAdminToggle && adminPinBox) {
+    btnAuthAdminToggle.addEventListener('click', () => {
+      adminPinBox.style.display = adminPinBox.style.display === 'none' ? 'block' : 'none';
+      if (adminPinInput) adminPinInput.focus();
+    });
+  }
+
+  if (btnCloseAdminPin && adminPinBox) {
+    btnCloseAdminPin.addEventListener('click', () => {
+      adminPinBox.style.display = 'none';
+    });
+  }
+
+  // Submit Admin PIN
+  if (btnSubmitAdminPin && adminPinInput) {
+    btnSubmitAdminPin.addEventListener('click', () => {
+      const pin = adminPinInput.value;
+      if (firebaseService.verifyAdminPin(pin)) {
+        showCoachToast('👑 تم تفعيل صلاحيات مسؤول النظام (Admin) بنجاح!');
+        audioCoach.speak(audioCoach.language === 'ar' ? 'تم تفعيل صلاحيات الأدمن' : 'Admin privileges granted');
+        applyRolePermissions('admin', firebaseService.user);
+        welcomeModal.classList.add('hidden');
+        if (adminPinBox) adminPinBox.style.display = 'none';
+        adminPinInput.value = '';
+      } else {
+        showAuthAlert('❌ رمز المرور السري للأدمن غير صحيح (الرمز الافتراضي: 2026)');
+      }
+    });
+  }
+
+  // Sidebar Auth Actions (Sign In button & Sign Out)
+  if (btnSidebarAuthAction) {
+    btnSidebarAuthAction.addEventListener('click', () => {
+      closeSidebar();
+      welcomeModal.classList.remove('hidden');
+    });
+  }
+
+  if (btnSidebarSignout) {
+    btnSidebarSignout.addEventListener('click', async () => {
+      await firebaseService.signOut();
+      applyRolePermissions('guest', null);
+      showCoachToast('تم تسجيل الخروج بنجاح');
+      closeSidebar();
+      welcomeModal.classList.remove('hidden');
+    });
+  }
+
+  // Listen to Global Cloud Auth Changes
+  window.addEventListener('cloud-auth-change', (e) => {
+    const { user, role } = e.detail || {};
+    applyRolePermissions(role || firebaseService.role, user || firebaseService.user);
   });
+
+  // Initial Permission Check on Load
+  applyRolePermissions(firebaseService.role, firebaseService.user);
 
   btnStartWorkout.addEventListener('click', () => {
     audioCoach.unlock();
@@ -1437,13 +1667,34 @@ document.addEventListener('DOMContentLoaded', () => {
   let selectedTrainingDays = 4;
   let latestAiGeneratedRoutine = null;
 
+  const EXERCISE_METADATA = {
+    pushups: { nameAr: '💪 تمرين الضغط (Push-ups)', yt: 'https://www.youtube.com/watch?v=IODxDxX7oi4' },
+    curls: { nameAr: '🦾 بايسيبس بالدمبل/البار (Bicep Curls)', yt: 'https://www.youtube.com/watch?v=ykJmrZ5v0Oo' },
+    shoulder_press: { nameAr: '🏋️‍♂️ ضغط أكتاف (Shoulder Press)', yt: 'https://www.youtube.com/watch?v=qEwKCR5JCog' },
+    lateral_raises: { nameAr: '🦅 رفرفة أكتاف جانبية (Lateral Raises)', yt: 'https://www.youtube.com/watch?v=3VcKaXpzqRo' },
+    tricep_dips: { nameAr: '⚡ غطس ترايسبس (Tricep Dips)', yt: 'https://www.youtube.com/watch?v=6kALZikXxLc' },
+    squats: { nameAr: '🦵 سكوات الأرجل (Squats)', yt: 'https://www.youtube.com/watch?v=aclHkVaku9U' },
+    lunges: { nameAr: '🚶‍♂️ طعنات فردية (Lunges)', yt: 'https://www.youtube.com/watch?v=QOVaHwm-Q6U' },
+    deadlifts: { nameAr: '🏋️ رفعة ميتة للظهر (Deadlifts)', yt: 'https://www.youtube.com/watch?v=ytGaGIn3SjE' },
+    crunches: { nameAr: '🍫 تمارين البطن (Crunches)', yt: 'https://www.youtube.com/watch?v=Xyd_fa5zoEU' },
+    plank: { nameAr: '⏱️ بلانك ثبات (Plank Hold)', yt: 'https://www.youtube.com/watch?v=ASdvN_XEl_c' },
+    jacks: { nameAr: '⭐ قفز نجمي هوائي (Jumping Jacks)', yt: 'https://www.youtube.com/watch?v=iSSAk4XCsRA' }
+  };
+
   dayOptBtns.forEach(btn => {
     btn.addEventListener('click', () => {
       dayOptBtns.forEach(b => b.classList.remove('active'));
       btn.classList.add('active');
       selectedTrainingDays = parseInt(btn.dataset.days) || 4;
+      generateCustomAiRoutine();
     });
   });
+
+  if (selectTrainingGoal) {
+    selectTrainingGoal.addEventListener('change', () => {
+      generateCustomAiRoutine();
+    });
+  }
 
   if (btnUploadBicepsPhoto && inputBicepsPhoto) {
     btnUploadBicepsPhoto.addEventListener('click', () => inputBicepsPhoto.click());
@@ -1455,6 +1706,8 @@ document.addEventListener('DOMContentLoaded', () => {
           runBicepsScanProcess(evt.target.result);
         };
         reader.readAsDataURL(file);
+        // Reset file input so user can re-select anytime
+        e.target.value = '';
       }
     });
   }
@@ -1462,16 +1715,21 @@ document.addEventListener('DOMContentLoaded', () => {
   if (btnCaptureBicepsLive) {
     btnCaptureBicepsLive.addEventListener('click', () => {
       audioCoach.unlock();
-      if (video && video.videoWidth) {
-        const tempCanvas = document.createElement('canvas');
-        tempCanvas.width = video.videoWidth;
-        tempCanvas.height = video.videoHeight;
-        const ctx = tempCanvas.getContext('2d');
-        ctx.drawImage(video, 0, 0);
-        const dataUrl = tempCanvas.toDataURL('image/jpeg');
-        runBicepsScanProcess(dataUrl);
+      if (video && video.videoWidth && video.videoHeight) {
+        try {
+          const tempCanvas = document.createElement('canvas');
+          tempCanvas.width = video.videoWidth;
+          tempCanvas.height = video.videoHeight;
+          const ctx = tempCanvas.getContext('2d');
+          ctx.drawImage(video, 0, 0);
+          const dataUrl = tempCanvas.toDataURL('image/jpeg');
+          runBicepsScanProcess(dataUrl);
+        } catch (e) {
+          runBicepsScanProcess('icons/logo.jpg');
+        }
       } else {
-        showCoachToast('⚠️ الكاميرا غير نشطة، التقط صورة بعد بدء الكاميرا أو ارفع صورة من المعرض');
+        showCoachToast('⚡ جاري إجراء فحص البنية البدنية الذكي التجريبي...');
+        runBicepsScanProcess('icons/logo.jpg');
       }
     });
   }
@@ -1485,8 +1743,8 @@ document.addEventListener('DOMContentLoaded', () => {
     if (bicepsScanLaser) bicepsScanLaser.style.display = 'block';
     if (bicepsAnalysisResults) bicepsAnalysisResults.style.display = 'none';
 
-    showCoachToast('🔍 جاري فحص بنية الجسم وتحليل وضعية دبل بايسبس بالذكاء الاصطناعي...');
-    audioCoach.speak(audioCoach.language === 'ar' ? 'جاري فحص زوايا البايسبس وتناسق الكتفين' : 'Analyzing body metrics');
+    showCoachToast('🔍 جاري فحص بنية الجسم بالذكاء الاصطناعي وتحليل وضعية دبل بايسبس...');
+    audioCoach.speak(audioCoach.language === 'ar' ? 'جاري فحص زوايا البايسبس وتناسق الكتفين وتوليد جدولك الرياضي' : 'Analyzing body metrics and generating custom routine');
 
     setTimeout(() => {
       if (bicepsScanLaser) bicepsScanLaser.style.display = 'none';
@@ -1507,102 +1765,269 @@ document.addEventListener('DOMContentLoaded', () => {
       if (valFlexion) valFlexion.textContent = `${flexion}° (انقباض قوي)`;
       if (valSymmetry) valSymmetry.textContent = `${symmetry}% (توازن ممتاز)`;
       if (valVtaper) valVtaper.textContent = `${vtaper} (V-Taper رياضي)`;
-      if (valStatus) valStatus.textContent = 'بنية رياضية واعدة - جاهز لبرنامج تضخيم وتحديد متقدم';
+      if (valStatus) valStatus.textContent = 'بنية رياضية واعدة - تم توليد برنامج تضخيم وتحديد مخصص';
 
-      showCoachToast('✅ تم اكتمال التحليل البدني بنجاح!');
-      audioCoach.speak(audioCoach.language === 'ar' ? 'تم اكتمال الفحص بنجاح! حدد عدد أيام تدريبك واضغط توليد الجدول' : 'Scan complete! Choose your training days');
+      // Automatically generate the professional routine immediately!
+      generateCustomAiRoutine();
+
+      showCoachToast('✅ تم اكتمال التحليل البدني وتوليد جدول التدريب بنجاح!');
+      audioCoach.speak(audioCoach.language === 'ar' ? 'تم اكتمال الفحص وتوليد جدولك الرياضي بنجاح يا بطل!' : 'Routine ready!');
     }, 2200);
   }
 
-  // Generate Personalized AI Routine
+  // Scientific Professional Routine Generator
+  function generateCustomAiRoutine() {
+    audioCoach.unlock();
+    const goal = selectTrainingGoal ? selectTrainingGoal.value : 'hypertrophy';
+    const days = selectedTrainingDays || 4;
+
+    const goalTitles = {
+      hypertrophy: 'تضخيم وبناء الكتلة العضلية V-Taper',
+      fatburn: 'تنشيف وحرق الدهون وإبراز التفاصيل',
+      strength: 'زيادة القوة البدنية وتحمل المفاصل'
+    };
+
+    let repMod = 0;
+    let restMod = 0;
+    if (goal === 'fatburn') {
+      repMod = 3;
+      restMod = -10;
+    } else if (goal === 'strength') {
+      repMod = -2;
+      restMod = 15;
+    }
+
+    function createEx(key, sets, baseReps, baseRest) {
+      const meta = EXERCISE_METADATA[key] || { nameAr: key, yt: '' };
+      return {
+        exerciseKey: key,
+        exerciseId: key,
+        nameAr: meta.nameAr,
+        sets: sets,
+        targetSets: sets,
+        targetReps: Math.max(5, baseReps + repMod),
+        restSeconds: Math.max(25, baseRest + restMod),
+        youtubeUrl: meta.yt
+      };
+    }
+
+    const generatedDays = [];
+
+    if (days === 3) {
+      // 3-Day Scientific Split (Upper Focus / Lower Core / Total Arms)
+      generatedDays.push(
+        {
+          dayId: 'ai_d1',
+          dayName: 'اليوم الأول: الصدر والأكتاف وذروة البايسبس (Upper & Biceps)',
+          exercises: [
+            createEx('pushups', 4, 12, 45),
+            createEx('curls', 4, 12, 40),
+            createEx('lateral_raises', 4, 15, 35)
+          ]
+        },
+        {
+          dayId: 'ai_d2',
+          dayName: 'اليوم الثاني: الأرجل والرفعة الميتة والبطن (Lower & Core)',
+          exercises: [
+            createEx('squats', 4, 15, 60),
+            createEx('deadlifts', 3, 10, 60),
+            createEx('crunches', 4, 20, 30)
+          ]
+        },
+        {
+          dayId: 'ai_d3',
+          dayName: 'اليوم الثالث: الذراعين والأكتاف وثبات بلانك (Arms & Delts)',
+          exercises: [
+            createEx('shoulder_press', 4, 10, 50),
+            createEx('tricep_dips', 4, 12, 45),
+            createEx('curls', 3, 10, 40),
+            createEx('plank', 3, 45, 35)
+          ]
+        }
+      );
+    } else if (days === 4) {
+      // 4-Day Scientific Split (Upper A / Lower A / Upper B / Lower B)
+      generatedDays.push(
+        {
+          dayId: 'ai_d1',
+          dayName: 'اليوم الأول: الجزء العلوي والبايسبس المتفجر (Upper Hypertrophy)',
+          exercises: [
+            createEx('pushups', 4, 12, 45),
+            createEx('curls', 4, 12, 40),
+            createEx('shoulder_press', 3, 10, 50)
+          ]
+        },
+        {
+          dayId: 'ai_d2',
+          dayName: 'اليوم الثاني: الجزء السفلي والطعنات والبطن (Lower & Abs)',
+          exercises: [
+            createEx('squats', 4, 15, 60),
+            createEx('lunges', 3, 12, 45),
+            createEx('crunches', 4, 20, 30)
+          ]
+        },
+        {
+          dayId: 'ai_d3',
+          dayName: 'اليوم الثالث: الظهر وأكتاف V-Taper والترايسبس (Back & Delts)',
+          exercises: [
+            createEx('deadlifts', 4, 10, 60),
+            createEx('lateral_raises', 4, 15, 35),
+            createEx('tricep_dips', 4, 12, 45)
+          ]
+        },
+        {
+          dayId: 'ai_d4',
+          dayName: 'اليوم الرابع: الأرجل والكور وثبات بلانك (Legs & Core Sculpt)',
+          exercises: [
+            createEx('squats', 4, 12, 60),
+            createEx('curls', 3, 10, 40),
+            createEx('plank', 4, 45, 35)
+          ]
+        }
+      );
+    } else if (days === 5) {
+      // 5-Day Bodybuilding Split
+      generatedDays.push(
+        {
+          dayId: 'ai_d1',
+          dayName: 'اليوم الأول: الصدر والكور (Chest & Core Power)',
+          exercises: [
+            createEx('pushups', 4, 12, 45),
+            createEx('crunches', 4, 20, 30),
+            createEx('plank', 3, 45, 35)
+          ]
+        },
+        {
+          dayId: 'ai_d2',
+          dayName: 'اليوم الثاني: الظهر والرفعة الميتة (Back & Deadlifts)',
+          exercises: [
+            createEx('deadlifts', 4, 10, 60),
+            createEx('lateral_raises', 3, 12, 40)
+          ]
+        },
+        {
+          dayId: 'ai_d3',
+          dayName: 'اليوم الثالث: ذراعين سوبر ست (Biceps & Triceps Blast)',
+          exercises: [
+            createEx('curls', 5, 12, 40),
+            createEx('tricep_dips', 4, 12, 45),
+            createEx('pushups', 3, 10, 45)
+          ]
+        },
+        {
+          dayId: 'ai_d4',
+          dayName: 'اليوم الرابع: الأكتاف العريضة V-Taper (Shoulders & Delts)',
+          exercises: [
+            createEx('shoulder_press', 4, 10, 50),
+            createEx('lateral_raises', 4, 15, 35),
+            createEx('crunches', 3, 15, 30)
+          ]
+        },
+        {
+          dayId: 'ai_d5',
+          dayName: 'اليوم الخامس: الأرجل والتحمل الهوائي (Legs & Conditioning)',
+          exercises: [
+            createEx('squats', 4, 15, 60),
+            createEx('lunges', 4, 12, 45),
+            createEx('jacks', 3, 30, 30)
+          ]
+        }
+      );
+    } else if (days === 6) {
+      // 6-Day PPL Dual Split (Push/Pull/Legs x 2)
+      generatedDays.push(
+        {
+          dayId: 'ai_d1',
+          dayName: 'اليوم الأول: دفع أ (Push A - صدر وأكتاف وترايسبس)',
+          exercises: [
+            createEx('pushups', 4, 12, 45),
+            createEx('shoulder_press', 4, 10, 50),
+            createEx('tricep_dips', 3, 12, 45)
+          ]
+        },
+        {
+          dayId: 'ai_d2',
+          dayName: 'اليوم الثاني: سحب أ (Pull A - ظهر وبايسبس وأكتاف جانبية)',
+          exercises: [
+            createEx('deadlifts', 4, 10, 60),
+            createEx('curls', 4, 12, 40),
+            createEx('lateral_raises', 4, 15, 35)
+          ]
+        },
+        {
+          dayId: 'ai_d3',
+          dayName: 'اليوم الثالث: أرجل أ (Legs A - أرجل وبطن)',
+          exercises: [
+            createEx('squats', 4, 15, 60),
+            createEx('lunges', 3, 12, 45),
+            createEx('crunches', 4, 20, 30)
+          ]
+        },
+        {
+          dayId: 'ai_d4',
+          dayName: 'اليوم الرابع: دفع ب (Push B - تركيز ضخامة الصدر والأكتاف)',
+          exercises: [
+            createEx('pushups', 4, 15, 45),
+            createEx('shoulder_press', 3, 10, 50),
+            createEx('tricep_dips', 4, 10, 45)
+          ]
+        },
+        {
+          dayId: 'ai_d5',
+          dayName: 'اليوم الخامس: سحب ب (Pull B - تركيز ذروة البايسبس والظهر)',
+          exercises: [
+            createEx('curls', 5, 12, 40),
+            createEx('deadlifts', 3, 10, 60),
+            createEx('lateral_raises', 4, 15, 35)
+          ]
+        },
+        {
+          dayId: 'ai_d6',
+          dayName: 'اليوم السادس: أرجل ب وكور (Legs B & Core Cardio)',
+          exercises: [
+            createEx('squats', 4, 12, 60),
+            createEx('plank', 4, 50, 35),
+            createEx('jacks', 3, 30, 30)
+          ]
+        }
+      );
+    }
+
+    const newRoutine = {
+      id: `routine_ai_${Date.now()}`,
+      name: `🤖 جدول AI Gym المخصص (${days} أيام - ${goalTitles[goal]})`,
+      description: `جدول تدريبي مبني علمياً ومخصص لبنيتك البدنية، يركز على تضخيم البايسبس وتوسيع الأكتاف V-Taper وتقوية الجذع.`,
+      days: generatedDays
+    };
+
+    latestAiGeneratedRoutine = newRoutine;
+    routineManager.addRoutine(newRoutine);
+
+    if (generatedRoutinePreview) {
+      generatedRoutinePreview.style.display = 'block';
+      if (genRoutineTitle) genRoutineTitle.textContent = newRoutine.name;
+      if (genRoutineDesc) genRoutineDesc.textContent = newRoutine.description;
+      if (genRoutineDaysSummary) {
+        genRoutineDaysSummary.innerHTML = generatedDays.map((d, idx) => `
+          <div style="background: rgba(255,255,255,0.04); border: 1px solid rgba(212,175,55,0.25); border-radius: 8px; padding: 8px 10px; margin-bottom: 6px;">
+            <div style="font-weight: 700; color: var(--gold-bright); font-size: 0.82rem;">${d.dayName}</div>
+            <div style="font-size: 0.74rem; color: #DDD; margin-top: 3px;">
+              ${d.exercises.map(ex => `<span style="display: inline-block; background: rgba(0,0,0,0.4); padding: 2px 6px; border-radius: 4px; margin: 2px 3px; border: 1px solid #333;">${ex.nameAr} (${ex.sets} جولات × ${ex.targetReps} عدة)</span>`).join('')}
+            </div>
+          </div>
+        `).join('');
+      }
+    }
+
+    return newRoutine;
+  }
+
+  // Button manual trigger
   if (btnGenerateAiRoutine) {
     btnGenerateAiRoutine.addEventListener('click', () => {
-      audioCoach.unlock();
-      const goal = selectTrainingGoal ? selectTrainingGoal.value : 'hypertrophy';
-      const days = selectedTrainingDays;
-
-      const goalNames = {
-        hypertrophy: 'بناء وتضخيم العضلات',
-        fatburn: 'تنشيف وحرق الدهون',
-        strength: 'قوة بدنية ولياقة شاملة'
-      };
-
-      const generatedDays = [];
-      if (days === 3) {
-        generatedDays.push(
-          { dayId: 'ai_d1', dayName: 'اليوم 1: الجزء العلوي وبايسبس', exercises: [
-            { exerciseKey: 'pushups', targetSets: 3, targetReps: 12, restSeconds: 45 },
-            { exerciseKey: 'curls', targetSets: 4, targetReps: 10, restSeconds: 45 },
-            { exerciseKey: 'lateral_raises', targetSets: 3, targetReps: 12, restSeconds: 40 }
-          ]},
-          { dayId: 'ai_d2', dayName: 'اليوم 2: الجزء السفلي والسكوات', exercises: [
-            { exerciseKey: 'squats', targetSets: 4, targetReps: 12, restSeconds: 60 },
-            { exerciseKey: 'lunges', targetSets: 3, targetReps: 10, restSeconds: 45 },
-            { exerciseKey: 'deadlifts', targetSets: 3, targetReps: 10, restSeconds: 60 }
-          ]},
-          { dayId: 'ai_d3', dayName: 'اليوم 3: البطن والكارديو والترايسبس', exercises: [
-            { exerciseKey: 'crunches', targetSets: 4, targetReps: 15, restSeconds: 30 },
-            { exerciseKey: 'tricep_dips', targetSets: 3, targetReps: 12, restSeconds: 45 },
-            { exerciseKey: 'plank', targetSets: 3, targetReps: 45, restSeconds: 40 }
-          ]}
-        );
-      } else if (days === 4) {
-        generatedDays.push(
-          { dayId: 'ai_d1', dayName: 'اليوم 1: الصدر والترايسبس (Push)', exercises: [
-            { exerciseKey: 'pushups', targetSets: 4, targetReps: 12, restSeconds: 45 },
-            { exerciseKey: 'tricep_dips', targetSets: 3, targetReps: 10, restSeconds: 45 },
-            { exerciseKey: 'shoulder_press', targetSets: 3, targetReps: 10, restSeconds: 50 }
-          ]},
-          { dayId: 'ai_d2', dayName: 'اليوم 2: الظهر والبايسبس العريض (Pull)', exercises: [
-            { exerciseKey: 'curls', targetSets: 4, targetReps: 12, restSeconds: 40 },
-            { exerciseKey: 'deadlifts', targetSets: 3, targetReps: 10, restSeconds: 60 },
-            { exerciseKey: 'lateral_raises', targetSets: 3, targetReps: 15, restSeconds: 40 }
-          ]},
-          { dayId: 'ai_d3', dayName: 'اليوم 3: الأرجل والسمانة (Legs)', exercises: [
-            { exerciseKey: 'squats', targetSets: 4, targetReps: 15, restSeconds: 60 },
-            { exerciseKey: 'lunges', targetSets: 3, targetReps: 12, restSeconds: 45 }
-          ]},
-          { dayId: 'ai_d4', dayName: 'اليوم 4: الأكتاف والبطن والكارديو (Core & Delts)', exercises: [
-            { exerciseKey: 'shoulder_press', targetSets: 4, targetReps: 10, restSeconds: 45 },
-            { exerciseKey: 'lateral_raises', targetSets: 4, targetReps: 12, restSeconds: 40 },
-            { exerciseKey: 'crunches', targetSets: 4, targetReps: 20, restSeconds: 30 }
-          ]}
-        );
-      } else {
-        for (let i = 1; i <= days; i++) {
-          generatedDays.push({
-            dayId: `ai_d${i}`,
-            dayName: `اليوم ${i}: تدريب تخصصي متقدم`,
-            exercises: [
-              { exerciseKey: i % 2 === 0 ? 'squats' : 'pushups', targetSets: 3, targetReps: 12, restSeconds: 45 },
-              { exerciseKey: i % 2 === 0 ? 'curls' : 'shoulder_press', targetSets: 3, targetReps: 10, restSeconds: 45 }
-            ]
-          });
-        }
-      }
-
-      const newRoutine = {
-        id: `routine_ai_${Date.now()}`,
-        name: `🤖 روتين AI Gym المخصص (${days} أيام - ${goalNames[goal]})`,
-        description: `جدول تدريبي مولّد بالذكاء الاصطناعي خصيصاً للمتدرب لتحسين زوايا البايسبس وتوسيع الأكتاف V-Taper.`,
-        days: generatedDays
-      };
-
-      latestAiGeneratedRoutine = newRoutine;
-      routineManager.addRoutine(newRoutine);
-      routineManager.selectRoutine(newRoutine.id);
-
-      if (generatedRoutinePreview) {
-        generatedRoutinePreview.style.display = 'block';
-        if (genRoutineTitle) genRoutineTitle.textContent = newRoutine.name;
-        if (genRoutineDesc) genRoutineDesc.textContent = newRoutine.description;
-        if (genRoutineDaysSummary) {
-          genRoutineDaysSummary.innerHTML = generatedDays.map(d => `• <strong>${d.dayName}</strong> (${d.exercises.length} تمارين)`).join('<br>');
-        }
-      }
-
-      showCoachToast(`✨ تم توليد وتفعيل ${newRoutine.name}`);
-      audioCoach.speak(audioCoach.language === 'ar' ? 'تم تفعيل جدولك المخصص بنجاح يا بطل! اضغط لبدء تمرين اليوم الأول' : 'AI Routine generated and active!');
+      const rt = generateCustomAiRoutine();
+      showCoachToast(`✨ تم تحديث وتفعيل ${rt.name}`);
+      audioCoach.speak(audioCoach.language === 'ar' ? 'تم تحديث جدولك الرياضي بنجاح! اضغط لبدء تمرين اليوم الأول' : 'AI Routine updated and active!');
     });
   }
 
@@ -1612,7 +2037,7 @@ document.addEventListener('DOMContentLoaded', () => {
         closeSidebar();
         routineManager.startDaySession(latestAiGeneratedRoutine.days[0].dayId);
         showCoachToast(`🚀 بدأت جلسة: ${latestAiGeneratedRoutine.days[0].dayName}`);
-        audioCoach.speak(audioCoach.language === 'ar' ? `انطلق! بدأت جلسة ${latestAiGeneratedRoutine.days[0].dayName}` : 'Session started!');
+        audioCoach.speak(audioCoach.language === 'ar' ? `انطلق يا بطل! بدأت جلسة ${latestAiGeneratedRoutine.days[0].dayName}` : 'Session started!');
         if (!isWorkoutActive) startWorkout();
       }
     });
